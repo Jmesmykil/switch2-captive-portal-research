@@ -29,8 +29,10 @@ MODULE_FILES = {
     "/switch2-probes-runtime.js": "switch2-probes-runtime.js",
     "/switch2-probes-media.js": "switch2-probes-media.js",
     "/switch2-probes-network.js": "switch2-probes-network.js",
+    "/switch2-probes-fonts.js": "switch2-probes-fonts.js",
+    "/switch2-probes-webkit.js": "switch2-probes-webkit.js",
 }
-TEST_NAMES = frozenset(("runtime", "media", "network", "boundaries"))
+TEST_NAMES = frozenset(("runtime", "media", "network", "boundaries", "fonts", "webkit"))
 TEST_PATHS = {name: "/switch2-probes-" + name + ".js" for name in TEST_NAMES}
 FIXTURE_FILES = {
     "/probe-fixtures/probe-h264.mp4": ("probe-h264.mp4", "video/mp4"),
@@ -382,10 +384,10 @@ class ProbeHandler(BaseHTTPRequestHandler):
             s["seen"] = time.monotonic()
             if self.path == "/live/queue":
                 tests = body.get("tests")
-                if (set(body) != {"tests"} or not isinstance(tests, list) or not 1 <= len(tests) <= 4
+                if (set(body) != {"tests"} or not isinstance(tests, list) or not 1 <= len(tests) <= len(TEST_NAMES)
                         or any(not isinstance(t, str) or t not in TEST_NAMES for t in tests)
                         or len(set(tests)) != len(tests)):
-                    self.respond(400, {"error": "Choose up to four distinct installed browser tests."})
+                    self.respond(400, {"error": "Choose up to %d distinct installed browser tests." % len(TEST_NAMES)})
                     return
                 if s["running"] or s["pending"]:
                     self.respond(409, {"error": "Finish the current test set first."})

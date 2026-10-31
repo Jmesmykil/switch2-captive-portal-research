@@ -14,6 +14,8 @@ fieldset{border:1px solid #41616d;border-radius:8px;margin:18px 0;padding:12px}h
 <button class="probe" data-test="runtime" disabled>Runtime</button>
 <button class="probe" data-test="media" disabled>Media and graphics</button>
 <button class="probe" data-test="boundaries" disabled>Small boundary checks</button>
+<button class="probe" data-test="fonts" disabled>Fonts and FontFace</button>
+<button class="probe" data-test="webkit" disabled>WebKit features</button>
 <button id="baseline" class="probe" disabled>Run baseline set</button>
 </fieldset>
 <p class="note">Boundary checks use 48 fixed cases, at most a 4 KiB buffer, and a two-second deadline checked between cases. They exercise JSON, URI, typed-array, text and URL APIs locally. They make no native or network requests.</p>
@@ -73,6 +75,8 @@ END</pre>
   if (test === 'media') { return '/switch2-probes-media.js'; }
   if (test === 'network') { return '/switch2-probes-network.js'; }
   if (test === 'boundaries') { return '/switch2-probes-boundaries.js'; }
+  if (test === 'fonts') { return '/switch2-probes-fonts.js'; }
+  if (test === 'webkit') { return '/switch2-probes-webkit.js'; }
   return null;
  }
  function loadModule(job,g) {
@@ -132,7 +136,7 @@ END</pre>
      var counts = {}, checks = value.checks || [];
      for (var i = 0; i < checks.length; i += 1) { counts[checks[i].status] = (counts[checks[i].status] || 0)+1; }
      lines.push(job.test+': '+JSON.stringify(counts)); lines = lines.slice(-20); results.textContent = lines.join('\n');
-     reports.push({ test:job.test, revision:job.revision, result:value, elapsedMs:Date.now()-begin }); reports = reports.slice(-4);
+     reports.push({ test:job.test, revision:job.revision, result:value, elapsedMs:Date.now()-begin }); reports = reports.slice(-testButtons.length);
      pendingCount = Math.max(0,pendingCount-1); busy = false; buttons(); show('Results received by the Mac.'); schedule(g);
     });
    }).catch(function (error) { if (g !== generation) { return; } busy = false; active = false; buttons(); show('Stopped: '+error.message+'. Choose Connect to retry.'); });
@@ -187,7 +191,7 @@ END</pre>
  document.getElementById('connect').onclick = connect; document.getElementById('stop').onclick = stop;
  var testButtons = document.querySelectorAll('[data-test]');
  for (var b = 0; b < testButtons.length; b++) { testButtons[b].onclick = function () { queue([this.getAttribute('data-test')]); }; }
- document.getElementById('baseline').onclick = function () { queue(['network','runtime','media']); };
+ document.getElementById('baseline').onclick = function () { queue(['network','runtime','media','boundaries','fonts','webkit']); };
  document.getElementById('library-filter').onchange = renderLibrary;
  document.getElementById('library-search').oninput = renderLibrary;
  document.getElementById('export').onclick = function () { var field = document.getElementById('report'); field.hidden = false; field.value = JSON.stringify({ pageBuild:4, exportedAt:new Date().toISOString(), browser:navigator.userAgent, reports:reports },null,2); };

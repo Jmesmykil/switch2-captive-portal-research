@@ -6,7 +6,7 @@ ROOT=Path(__file__).resolve().parent
 SOURCE=ROOT / 'switch2-local-browser-entry.py'
 spec=importlib.util.spec_from_file_location('original_local_entry',SOURCE)
 base=importlib.util.module_from_spec(spec);spec.loader.exec_module(base)
-base.HOSTS=base.HOSTS|{'ctest-ipv6.p01.ctest.srv.nintendo.net'}
+base.HOSTS=base.HOSTS|{'ctest-ipv6.p01.ctest.srv.nintendo.net','api.p01.lp1.tabiji.srv.nintendo.net','topics.p01.lp1.bcat.srv.nintendo.net','dauth.p01.lp1.ndas.srv.nintendo.net'}
 LOG_HOSTS=base.HOSTS|{'ctest-dl.p01.lp1.ctest.srv.nintendo.net','ctest-ul.p01.lp1.ctest.srv.nintendo.net','api.p01.lp1.ctest.srv.nintendo.net'}
 lock=threading.Lock();context=threading.local()
 def profile():

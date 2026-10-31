@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import re
 import threading
 import unittest
 from http.client import HTTPConnection
@@ -57,6 +58,38 @@ class PortalTests(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertEqual(value['job']['test'], 'boundaries')
         self.assertEqual(value['job']['revision'], self.server.module_revision('boundaries'))
+
+    def test_full_page_baseline_queues_and_completes_all_installed_modules(self):
+        page = (ROOT.parent / 'switch2-browser-probe.html').read_text()
+        match = re.search(r"getElementById\('baseline'\).*queue\((\[[^]]+\])\)", page)
+        self.assertIsNotNone(match)
+        tests = json.loads(match.group(1).replace("'", '"'))
+        self.assertEqual(set(tests), portal.TEST_NAMES)
+        self.assertEqual(len(tests), 6)
+        code, queued = self.request('/live/queue', {'tests': tests}, self.key)
+        self.assertEqual(code, 200)
+        self.assertEqual([job['test'] for job in queued['queued']], tests)
+        for test in tests:
+            with self.subTest(test=test):
+                code, value = self.request('/live/next', {}, self.key)
+                self.assertEqual(code, 200)
+                job = value['job']
+                self.assertEqual(job['test'], test)
+                route = portal.TEST_PATHS[test] + '?v=' + job['revision']
+                code, source = self.request(route)
+                self.assertEqual(code, 200)
+                self.assertEqual(source, (ROOT.parent / portal.MODULE_FILES[portal.TEST_PATHS[test]]).read_bytes())
+                result = {'jobId': job['jobId'], 'test': test, 'revision': job['revision'],
+                          'result': {'checks': [{'id': 'host-queue-fixture', 'status': 'passed'}]}}
+                self.assertEqual(self.request('/live/result', result, self.key)[0], 201)
+        self.assertEqual(self.request('/live/next', {}, self.key), (200, {'job': None}))
+        self.assertEqual(self.server.sessions[self.key]['pending'], [])
+        self.assertIsNone(self.server.sessions[self.key]['running'])
+
+    def test_oversized_queue_rejected_without_pending_jobs(self):
+        tests = sorted(portal.TEST_NAMES) + ['runtime']
+        self.assertEqual(self.request('/live/queue', {'tests': tests}, self.key)[0], 400)
+        self.assertEqual(self.server.sessions[self.key]['pending'], [])
 
     def test_native_arbitrary_duplicate_and_malformed_queue_rejected(self):
         for tests in [['native'], ['GetInfo'], ['runtime', 'runtime'], [], [{}], ['runtime'] * 5]:
