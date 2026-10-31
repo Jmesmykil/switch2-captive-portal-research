@@ -4,6 +4,16 @@ I built this bench to learn what the Switch browser actually exposes and to give
 
 The page and tests have been exercised on a desktop host. The packaged revision has **not** been validated on a physical Switch 2. If you try it on hardware, record the system version, setup, exact steps, and what happened; an unsupported or blocked API is a result too.
 
+## Takeover research update — 31 October 2026
+
+A separate local experimental dashboard now presents a ten-stage takeover workflow with per-stage status and host reporting. The dashboard source exists; a successful end-to-end takeover has not been verified.
+
+Source review found that the early stages attempt browser memory-corruption operations, while the later application-transition, parser, kernel, and custom-firmware stages remain pending or blocked. Some success labels are assigned without checking the claimed result, and execution can continue after a caught failure. Those labels must not be treated as evidence that a stage succeeded.
+
+No console-run evidence was verified for this update. Browser execution, a completed takeover, and support for either Switch generation remain unverified. The local OSNX dashboard title does not change this repository's Switch 2 research-bench scope.
+
+This is a documentation update. The published bench remains the bounded diagnostic tool described below; executable takeover code is not included. Further status updates need evidence tied to an exact revision, target system and firmware, with observed results separated from planned stages.
+
 ## What is here
 
 - `switch2-local-browser-entry.py`: local DNS and HTTP entry for a short allowlist of connectivity-test domains. Other DNS names receive NXDOMAIN; nothing is forwarded.
