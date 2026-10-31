@@ -65,7 +65,7 @@ class PortalTests(unittest.TestCase):
         self.assertIsNotNone(match)
         tests = json.loads(match.group(1).replace("'", '"'))
         self.assertEqual(set(tests), portal.TEST_NAMES)
-        self.assertEqual(len(tests), 6)
+        self.assertEqual(len(tests), 7)
         code, queued = self.request('/live/queue', {'tests': tests}, self.key)
         self.assertEqual(code, 200)
         self.assertEqual([job['test'] for job in queued['queued']], tests)

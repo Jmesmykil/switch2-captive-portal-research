@@ -8,7 +8,7 @@ The page and tests have been exercised on a desktop host. The packaged revision 
 
 - `switch2-local-browser-entry.py`: local DNS and HTTP entry for a short allowlist of connectivity-test domains. Other DNS names receive NXDOMAIN; nothing is forwarded.
 - `observed-entry.py`: the same entry with optional response profiles and bounded local traffic logging.
-- `serve-switch2-browser-probe.py` and the HTML/JavaScript modules: browser checks for network and input, runtime, media, fixed-size boundary cases, FontFace availability/loading, and a WebKit feature inventory. Nothing runs until you choose a test. The `fonts` and `webkit` modules are bounded diagnostics: they do not trigger a CVE, groom the heap, or load a crafted font.
+- `serve-switch2-browser-probe.py` and the HTML/JavaScript modules: browser checks for network and input, runtime, media, fixed-size boundary cases, FontFace availability/loading, a WebKit feature inventory, and a local-font environment inventory. Nothing runs until you choose a test. The `fonts`, `webkit`, and `fontenv` modules are bounded diagnostics: they do not trigger a CVE, groom the heap, override `FontFace.prototype.then`, invalidate style during a font load, or load a crafted font.
 - `tests/`: host-side server and JavaScript checks. These do not prove device behavior.
 
 The historical probe catalog is intentionally empty in this public release; it is not a record of completed research. The tiny media files are local test fixtures.
@@ -47,7 +47,7 @@ For the observation helper, replace the second command with `sudo python3 observ
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_*.py' -v
-node --test tests/test-boundaries.cjs tests/test-fonts.cjs tests/test-page-export.cjs
+node --test tests/test-boundaries.cjs tests/test-fonts.cjs tests/test-fontenv.cjs tests/test-page-export.cjs
 ```
 
 These run locally and do not contact a Switch. To share a finding, include steps and relevant redacted observations; remove IP addresses, device identifiers, tokens, and anything personal from reports. Please say whether your result came from desktop, emulator, or hardware. Contributions that clarify a result or make a test reproducible are welcome.

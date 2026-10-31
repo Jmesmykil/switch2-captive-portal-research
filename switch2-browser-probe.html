@@ -16,6 +16,7 @@ fieldset{border:1px solid #41616d;border-radius:8px;margin:18px 0;padding:12px}h
 <button class="probe" data-test="boundaries" disabled>Small boundary checks</button>
 <button class="probe" data-test="fonts" disabled>Fonts and FontFace</button>
 <button class="probe" data-test="webkit" disabled>WebKit features</button>
+<button class="probe" data-test="fontenv" disabled>Font environment</button>
 <button id="baseline" class="probe" disabled>Run baseline set</button>
 </fieldset>
 <p class="note">Boundary checks use 48 fixed cases, at most a 4 KiB buffer, and a two-second deadline checked between cases. They exercise JSON, URI, typed-array, text and URL APIs locally. They make no native or network requests.</p>
@@ -77,6 +78,7 @@ END</pre>
   if (test === 'boundaries') { return '/switch2-probes-boundaries.js'; }
   if (test === 'fonts') { return '/switch2-probes-fonts.js'; }
   if (test === 'webkit') { return '/switch2-probes-webkit.js'; }
+  if (test === 'fontenv') { return '/switch2-probes-fontenv.js'; }
   return null;
  }
  function loadModule(job,g) {
@@ -191,7 +193,7 @@ END</pre>
  document.getElementById('connect').onclick = connect; document.getElementById('stop').onclick = stop;
  var testButtons = document.querySelectorAll('[data-test]');
  for (var b = 0; b < testButtons.length; b++) { testButtons[b].onclick = function () { queue([this.getAttribute('data-test')]); }; }
- document.getElementById('baseline').onclick = function () { queue(['network','runtime','media','boundaries','fonts','webkit']); };
+ document.getElementById('baseline').onclick = function () { queue(['network','runtime','media','boundaries','fonts','webkit','fontenv']); };
  document.getElementById('library-filter').onchange = renderLibrary;
  document.getElementById('library-search').oninput = renderLibrary;
  document.getElementById('export').onclick = function () { var field = document.getElementById('report'); field.hidden = false; field.value = JSON.stringify({ pageBuild:4, exportedAt:new Date().toISOString(), browser:navigator.userAgent, reports:reports },null,2); };

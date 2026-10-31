@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 const page = fs.readFileSync(path.join(__dirname, '..', 'switch2-browser-probe.html'), 'utf8');
-test('page report export retains the complete six-module baseline', () => {
+test('page report export retains the complete installed-module baseline', () => {
   const baseline = JSON.parse(page.match(/getElementById\('baseline'\).*queue\((\[[^\]]+\])\)/)[1].replaceAll("'", '"'));
   const append = page.match(/reports\.push\([^\n]+/)[0];
   const exportBody = page.match(/getElementById\('export'\)\.onclick = function \(\) \{([^\n]+)\};/)[1];

@@ -31,8 +31,9 @@ MODULE_FILES = {
     "/switch2-probes-network.js": "switch2-probes-network.js",
     "/switch2-probes-fonts.js": "switch2-probes-fonts.js",
     "/switch2-probes-webkit.js": "switch2-probes-webkit.js",
+    "/switch2-probes-fontenv.js": "switch2-probes-fontenv.js",
 }
-TEST_NAMES = frozenset(("runtime", "media", "network", "boundaries", "fonts", "webkit"))
+TEST_NAMES = frozenset(("runtime", "media", "network", "boundaries", "fonts", "webkit", "fontenv"))
 TEST_PATHS = {name: "/switch2-probes-" + name + ".js" for name in TEST_NAMES}
 FIXTURE_FILES = {
     "/probe-fixtures/probe-h264.mp4": ("probe-h264.mp4", "video/mp4"),
