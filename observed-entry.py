@@ -52,11 +52,15 @@ class Entry(base.EntryHandler):
    if not head:self.wfile.write(data)
    status=401
   elif recognized and mode=='connectivity_ok':
-   self.protocol_version='HTTP/1.1';self.send_response(200)
-   for k,v in [('Content-Type','text/plain'),('Content-Length','2'),('Cache-Control','max-age=0, no-cache, no-store'),('Pragma','no-cache'),('X-Organization','Nintendo'),('Connection','close')]:self.send_header(k,v)
-   self.end_headers()
-   if not head:self.wfile.write(b'ok')
-   status=200
+   self.protocol_version='HTTP/1.1'
+   if 'ctest' in self.headers.get('Host',''):
+       self.send_response(200)
+       for k,v in [('Content-Type','text/plain'),('Content-Length','2'),('Cache-Control','max-age=0, no-cache, no-store'),('Pragma','no-cache'),('X-Organization','Nintendo'),('Connection','keep-alive')]: self.send_header(k,v)
+       self.end_headers()
+       if not head: self.wfile.write(b'ok')
+       return
+   super().reply(status,body,location,head)
+   return
   elif recognized and mode=='inline':
    data=('<!doctype html><meta charset="utf-8"><title>Local portal probe</title><h1>Local captive portal reached</h1><p>Trial: inline HTTP200.</p><a href="'+html.escape(self.server.redirect_url,quote=True)+'">Open prior browser tests</a>').encode()
    self.send_response(200)

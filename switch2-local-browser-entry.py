@@ -86,7 +86,7 @@ def dns_reply(packet, address):
             raise ValueError("Unexpected trailing bytes")
         question = b"".join(bytes((len(label),)) + label for label in labels) + b"\0" + struct.pack("!HH", query_type, query_class)
         hostname = b".".join(labels).lower()
-        known = hostname in {name.encode("ascii") for name in HOSTS}
+        known = hostname in {name.encode("ascii") for name in HOSTS} or hostname.endswith(b".savanna.srv.nintendo.net") or hostname.endswith(b".idobata.srv.nintendo.net") or hostname == b"savanna.srv.nintendo.net"
         if query_class != 1:
             return response(5, question)
         if not known:
@@ -197,7 +197,7 @@ class EntryHandler(BaseHTTPRequestHandler):
         except ValueError:
             self.reply(400, b"Invalid host.\n", head=head)
             return
-        if host in HOSTS and self.path == "/":
+        if (host in HOSTS or host.endswith(".savanna.srv.nintendo.net") or host.endswith(".idobata.srv.nintendo.net") or host == "savanna.srv.nintendo.net") and self.path == "/":
             self.reply(302, b"Open the local feature inventory.\n", self.server.redirect_url, head)
         elif host == self.server.bind_ip and self.path == "/health":
             self.reply(200, b"Local browser entry helper ready.\n", head=head)
