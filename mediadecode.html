@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>switch2 media decode probe</title>
+<style>
+  body { margin:0; padding:20px; background:#0b0e14; color:#d7dce5; font:14px/1.5 system-ui,sans-serif; }
+  pre { white-space:pre-wrap; background:#10141c; border:1px solid #263349; padding:12px; border-radius:8px; }
+  button { font:inherit; padding:8px 16px; background:#1f6feb; color:#fff; border:0; border-radius:6px; }
+</style>
+</head>
+<body>
+<h1>Switch 2 media decode probe (fw-specific)</h1>
+<p>Tests whether the WifiWebAuthApplet can reach real H.264 / VP8 / VP9 decode from this entry.
+This is a reachability measurement only: it feeds tiny, well-formed clips, never a malformed
+bitstream, so it cannot fault the decoder. Results are POSTed to /report.</p>
+<button id="go">Run once</button>
+<pre id="log">idle — press Run once</pre>
+
+<script>
+(function () {
+  "use strict";
+  var log = document.getElementById("log");
+  var lines = [];
+  function out(s) { lines.push(String(s)); log.textContent = lines.join("\n"); }
+  function stamp() { return new Date().toISOString().replace("T", " ").slice(0, 23); }
+
+  // Fire a lightweight load-beacon immediately on page load, BEFORE any <video>
+  // attempt, so even if <video> errors (2110-3400, no media pipeline) the device
+  // still returns UA + "page loaded, starting decode" to /report.
+  function loadBeacon() {
+    var body = JSON.stringify({ probe: "switch2-media-decode", stage: "page-loaded", ts: stamp(), ua: navigator.userAgent, startHint: "beacon fired before video", ongethint: (typeof HTMLVideoElement !== "undefined") });
+    try {
+      var x = new XMLHttpRequest();
+      x.open("POST", "/report", true);
+      x.setRequestHeader("content-type", "application/json");
+      x.send(body);
+    } catch (e) {}
+  }
+
+  // Per-format probe: canPlayType + attempt real <video> load/decode of a well-formed clip.
+  function probeOne(format, url, mime, done, timeoutMs) {
+    var doneFlag = false;
+    var t0 = Date.now();
+    var timer = setTimeout(function () { finish("timeout", {}); }, timeoutMs || 15000);
+    function finish(status, extra) { if (doneFlag) { return; } doneFlag = true; clearTimeout(timer); done({ format: format, url: url, mime: mime, status: status, elapsedMs: Date.now() - t0, extra: extra || {} }); }
+
+    var v = document.createElement("video");
+    v.muted = true; v.playsInline = true; v.preload = "auto";
+    v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("webkit-playsinline", "");
+    v.style.cssText = "position:absolute;left:-9999px;width:2px;height:2px;opacity:0.01;";
+    var cpt = typeof v.canPlayType === "function" ? v.canPlayType(mime) : "no-canPlayType";
+
+    var gotData = false, gotMeta = false, gotPlaying = false;
+    v.onloadedmetadata = function () { gotMeta = true; };
+    v.onloadeddata = function () { gotData = true; };
+    v.onplaying = function () { gotPlaying = true; };
+    v.onerror = function () {
+      var c = (v.error && typeof v.error.code === "number") ? v.error.code : null;
+      var msg = (v.error && v.error.message) || "";
+      finish("error", { code: c, message: msg, readyState: v.readyState, networkState: v.networkState, canPlayType: cpt });
+    };
+    v.oncanplay = function () {
+      finish("canplay", { videoWidth: v.videoWidth, videoHeight: v.videoHeight, duration: v.duration, readyState: v.readyState, networkState: v.networkState, canPlayType: cpt, gotMeta: gotMeta, gotData: gotData, gotPlaying: gotPlaying });
+    };
+    try { v.src = url + "?t=" + Date.now(); } catch (e) { try { v.load(); } catch (e2) {} }
+    try { v.load(); } catch (e) {}
+    document.body.appendChild(v);
+  }
+
+  function report(payload) {
+    var body = JSON.stringify({ probe: "switch2-media-decode", ts: stamp(), ua: navigator.userAgent, result: payload.result, media: payload.media, generatedAt: payload.generatedAt }, null, 2);
+    out("----------------------------------------");
+    try { out(body); } catch (e) { out("report body non-serializable: " + e); }
+    try {
+      var x = new XMLHttpRequest();
+      x.open("POST", "/report", true);
+      x.setRequestHeader("content-type", "application/json");
+      x.onreadystatechange = function () { if (x.readyState === 4) { out("[report] POST /report -> " + x.status); } };
+      x.send(body);
+    } catch (e) { out("[report] POST failed: " + e); }
+  }
+
+  function run() {
+    lines = [];
+    out("starting decode probe @ " + stamp());
+    out("UA: " + navigator.userAgent);
+    var cases = [
+      ["h264", "/probe-h264.mp4", 'video/mp4; codecs="avc1.42E01E"'],
+      ["vp8",  "/probe-vp8.webm", 'video/webm; codecs="vp8"'],
+      ["vp9",  "/probe-vp9.webm", 'video/webm; codecs="vp9"']
+    ];
+    var i = 0, results = [];
+    function next() {
+      if (i >= cases.length) { finishAll(results); return; }
+      var c = cases[i++];
+      out("probe " + c[0] + " @" + stamp());
+      probeOne(c[0], c[1], c[2], function (r) {
+        results.push(r);
+        out("-> " + r.format + " = " + r.status + " (" + r.elapsedMs + "ms)" + (r.extra && r.extra.videoWidth ? " w=" + r.extra.videoWidth + " h=" + r.extra.videoHeight : ""));
+        next();
+      });
+    }
+    function finishAll(res) {
+      var md = {};
+      res.forEach(function (r) { md[r.format] = r; });
+      report({ result: "done", media: md, generatedAt: stamp() });
+      out("complete @ " + stamp());
+    }
+    next();
+  }
+
+  document.getElementById("go").addEventListener("click", run);
+  // Optional auto-run on load so the entry redirect alone is already a trigger.
+  // Left OFF so the console's arrival itself is controlled.
+  loadBeacon();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html><html><body style="margin:0;padding:10px;font-family:system-ui;background:#07090d;color:#cfe3ff">
+<h1 style="font-size:16px">WebSocket agent</h1>
+<pre id="o" style="font:12px/1.4 ui-monospace;white-space:pre-wrap;color:#9fb4d6"></pre>
+<script>
+var o=document.getElementById("o");
+function log(s){o.textContent+=s+"\n";}
+try{
+  var ws=new WebSocket("ws://192.168.50.1:8766/");
+  ws.onopen=function(){log("ws open");ws.send(JSON.stringify({hello:true,ua:navigator.userAgent}))};
+  ws.onmessage=function(e){
+    var c;try{c=JSON.parse(e.data)}catch(x){return}
+    log("cmd "+JSON.stringify(c).slice(0,200));
+    var out={cmd:c.cmd,ok:true,_ack:c._id};
+    try{
+      if(c.cmd==="ping")out.pong=Date.now();
+      else if(c.cmd==="probe")out.ua=navigator.userAgent,out.fonts=!!document.fonts;
+      else if(c.cmd==="eval")out.value=String(eval(c.code));
+      else if(c.cmd==="lswrite"){
+        var k=String(c.key||"osnx"), v=String(c.value||"");
+        localStorage.setItem(k,v);
+        out.key=k; out.len=v.length; out.readback=localStorage.getItem(k); out.keys=Object.keys(localStorage);
+      }
+      else if(c.cmd==="lsread"){ out.value=localStorage.getItem(String(c.key||"")); out.keys=Object.keys(localStorage); }
+      else if(c.cmd==="lsdump"){ out.items={}; for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);out.items[k]=localStorage.getItem(k);} out.count=localStorage.length; }
+      else if(c.cmd==="lsdel"){ localStorage.removeItem(String(c.key||"")); out.keys=Object.keys(localStorage); }
+      else if(c.cmd==="stage"){
+        var all={}; for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);all[k]=localStorage.getItem(k);}
+        out.count=localStorage.length;
+        fetch("/stage",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,store:all})}).catch(function(){});
+        out.staged=true;
+      }
+      else out.error="unknown";
+    }catch(x){out.ok=false;out.error=String(x)}
+    ws.send(JSON.stringify(out));
+  };
+  ws.onerror=function(){log("ws error")};
+  ws.onclose=function(){log("ws closed")};
+}catch(e){log("ws failed "+e)}
+</script></body></html>

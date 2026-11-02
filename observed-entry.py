@@ -42,6 +42,17 @@ class TCP(base.TCPHandler):
   context.peer=self.client_address[0];context.transport='tcp';return super().handle()
 class Entry(base.EntryHandler):
  def reply(self,status,body=b'',location=None,head=False):
+  # Additive: News/BCAT content host -> our media probe on the payload server,
+  # so a News-poll on the captive network lands on our decode page (not Nintendo).
+  if 'bcat' in self.headers.get('Host','') or 'topics' in self.headers.get('Host',''):
+   loc=getattr(self.server,'redirect_url',None) or 'http://192.168.50.1:8765/'
+   media='http://192.168.50.1:8765/mediadecode'
+   self.send_response(302)
+   for k,v in [('Location',media),('Content-Type','text/plain'),('Content-Length','2'),('Cache-Control','no-store')]: self.send_header(k,v)
+   self.end_headers()
+   if not head:self.wfile.write(b'ok')
+   event('http',peer=self.client_address[0],host=self.headers.get('Host','').split(':')[0],path_class='bcat_media',method=self.command,ua_class='news',profile='bcat_redirect',status=302,recognized_connection_root=True)
+   return
   mode=profile();ua=self.headers.get('User-Agent','')[:256]
   category='nifm' if ('nnNifm' in ua or 'NX NIFM' in ua) else 'browser' if 'Mozilla' in ua else 'other'
   recognized=(status==302 and location==self.server.redirect_url)

@@ -1,0 +1,7 @@
+<!doctype html><html><body><h1>OSNX beacon</h1><pre id="o"></pre><script>
+var info={ua:navigator.userAgent,href:location.href,referrer:document.referrer,origin:location.origin,
+fonts:!!document.fonts,ff:typeof FontFace,wasm:typeof WebAssembly,webgl:typeof WebGL2RenderingContext,
+usb:!!navigator.usb,fetch:typeof fetch};
+document.getElementById("o").textContent=JSON.stringify(info,null,1);
+fetch("/beacon",{method:"POST",body:JSON.stringify(info)}).catch(function(){});
+</script></body></html>

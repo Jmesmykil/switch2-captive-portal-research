@@ -1,0 +1,31 @@
+<!doctype html><html><head><meta charset="utf-8"><title>CSF async trigger</title>
+<style>body{margin:0;padding:18px;background:#0b0e14;color:#d7dce5;font-family:system-ui}
+#o{white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;color:#9fb4d6}</style></head>
+<body><div id="s">CSF</div><pre id="o"></pre><script>
+var out=document.getElementById("o"),LOG=[];
+function send(){fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:LOG})}).catch(function(){});}
+var _rt=0;function log(s){out.textContent+=s+"\n";LOG.push(s);try{if(_rt)clearTimeout(_rt);_rt=setTimeout(send,300);}catch(e){}}
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+async function run(){
+  log("UA: "+navigator.userAgent);
+  var st=document.createElement("style");
+  st.textContent="@font-face{font-family:TrigA;src:url(/font/crafted.otf);}";
+  document.head.append(st); void document.body.offsetHeight;
+  var face=null; for(var f of document.fonts){if(f.family.replaceAll(/['"]/g,"")==="TrigA"){face=f;break;}}
+  log("face: "+(face?"found":"missing")); if(!face)return;
+  var pending=face.loaded;                 // create the promise (pending, async font)
+  var fired=false, beforeLoad=true, old=FontFace.prototype.then;
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+    if(this===face){fired=true;log("getter fired (beforeLoad="+beforeLoad+")");}
+    return undefined;}});
+  log("calling face.load()");
+  beforeLoad=false;
+  try{face.load();}catch(e){log("load threw: "+e.message);}
+  log("load returned; fired="+fired);
+  await sleep(1200);
+  log("settled; fired="+fired);
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:old});
+  log("done");
+}
+run();
+</script></body></html>

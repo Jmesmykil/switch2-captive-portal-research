@@ -1,0 +1,19 @@
+<!doctype html><html><body style="margin:0;padding:12px;font-family:system-ui">
+<h1 style="font-size:17px">Relay → SmileBASIC bridge</h1>
+<button id="s" style="font-size:18px;padding:10px 20px;border-radius:10px">STATUS</button>
+<button id="q" style="font-size:18px;padding:10px 20px;border-radius:10px">READ (probe)</button>
+<pre id="o" style="font-size:12px/1.4 ui-monospace;white-space:pre-wrap"></pre>
+<script>
+var o=document.getElementById("o");
+function log(s){o.textContent+=s+"\n";}
+function relay(body,label){
+  log("["+label+"] sending…");
+  fetch("/relay",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
+   .then(function(r){return r.text().then(function(t){return [r.status,t]})})
+   .then(function(x){log("["+label+"] "+x[0]+" "+x[1].slice(0,300))})
+   .catch(function(e){log("["+label+"] err "+e)});
+}
+document.getElementById("s").addEventListener("click",function(){relay({command:"status"},"status")});
+document.getElementById("q").addEventListener("click",function(){relay({command:"read",address:0,length:4},"read")});
+log("relay ready — needs the SmileBASIC bridge running");
+</script></body></html>

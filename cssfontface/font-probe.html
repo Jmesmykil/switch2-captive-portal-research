@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8"><title>CSF font family probe</title>
+<style>body{margin:0;padding:16px;background:#0b0e14;color:#d7dce5;font-family:system-ui}
+#o{white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;color:#9fb4d6}</style></head>
+<body><div id="s">CSF</div><pre id="o"></pre><script>
+var out=document.getElementById("o"),LOG=[];
+function send(){fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:LOG})}).catch(function(){});}
+var _rt=0;function log(s){out.textContent+=s+"\n";LOG.push(s);if(_rt)clearTimeout(_rt);_rt=setTimeout(send,300);}
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+var FAMS=["Helvetica","Helvetica Bold","Arial","Arial Unicode","system-ui","sans-serif","serif","monospace",
+"Nintendo","Nintendo Switch","System Font","systemfont","Ume","UD Shin Gothic","Rodin","Hiragino Sans",
+"Hiragino Kaku Gothic ProN","Noto Sans","Noto Sans CJK JP","Noto Sans JP","Source Han Sans","Yu Gothic",
+"Meiryo","MS Gothic","MS PGothic","Segoe UI","Roboto","Open Sans","DejaVu Sans","Liberation Sans",
+"AppleGothic","Arial Hebrew","Tahoma","Verdana","Times New Roman","Courier New"];
+async function probe(fam){
+  var f;
+  try{ f=new FontFace("p","local("+fam+")",{unicodeRange:"U+0041"}); }catch(e){ return "ctor:"+e.message; }
+  document.fonts.add(f);
+  var fired=false,old=FontFace.prototype.then;
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){if(this===f)fired=true;return undefined;}});
+  var r=null,err=null;
+  try{ r=await document.fonts.load("1em p","A"); }catch(e){ err=e.message; }
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:old});
+  try{ document.fonts.delete(f); }catch(e){}
+  return "status="+f.status+" sync="+fired+(r?" loaded="+r.length:"")+(err?" err="+err:"");
+}
+(async function(){
+  log("UA: "+navigator.userAgent);
+  for(var i=0;i<FAMS.length;i++){
+    var res=await probe(FAMS[i]);
+    log(FAMS[i]+": "+res);
+    await sleep(60);
+  }
+  log("done");
+})();
+</script></body></html>

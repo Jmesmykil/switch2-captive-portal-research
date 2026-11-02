@@ -1,0 +1,33 @@
+<!doctype html><html><body style="margin:0;padding:12px;font-family:system-ui;background:#07090d;color:#cfe3ff">
+<h1 style="font-size:17px">WebKit — overlay hold (page stays live)</h1>
+<button id="sus" style="font-size:20px;padding:12px 24px;border-radius:10px">OVERLAY (keep live)</button>
+<button id="res" style="font-size:16px;padding:10px 18px;border-radius:10px">REMOVE OVERLAY</button>
+<div id="ov" style="position:fixed;inset:0;background:#000;display:none;z-index:9999;color:#333;padding:20px;font:14px system-ui">overlay — page still live</div>
+<div id="vis" style="margin-top:10px;font:12px ui-monospace;color:#9fb4d6"></div>
+<pre id="o" style="font:12px/1.4 ui-monospace;white-space:pre-wrap;color:#9fb4d6"></pre>
+<script>
+var L=[],o=document.getElementById("o"),v=document.getElementById("vis"),ov=document.getElementById("ov");
+function lg(s){o.textContent+=s+"\n";L.push(s);try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}catch(e){}}
+function hb(s){try{fetch("/beacon",{method:"POST",body:JSON.stringify({kind:"heartbeat",vis:document.visibilityState,ov:ov.style.display,ts:Date.now(),note:s})}).catch(function(){})}catch(e){}}
+document.addEventListener("visibilitychange",function(){lg("visibility="+document.visibilityState);hb("vischange:"+document.visibilityState)});
+var code="var n=0;setInterval(function(){n++;postMessage(n)},2500);";
+var w=null;
+function startWorker(){
+  try{w=new Worker(URL.createObjectURL(new Blob([code],{type:"text/javascript"})));
+    w.onmessage=function(e){v.textContent="worker alive n="+e.data;hb("worker:"+e.data)};
+    lg("worker started");
+  }catch(e){lg("worker failed: "+e.message)}
+}
+document.getElementById("sus").addEventListener("click",function(){
+  // overlay only — the page keeps rendering, so the heap/state stays valid
+  ov.style.display="block";
+  lg("overlay on — page still live (no display:none on body)");
+  startWorker(); hb("overlay-on");
+});
+document.getElementById("res").addEventListener("click",function(){
+  ov.style.display="none";
+  lg("overlay off"); hb("overlay-off");
+});
+lg("ready — overlay keeps the page active");
+hb("ready");
+</script></body></html>

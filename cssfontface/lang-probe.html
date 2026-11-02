@@ -1,0 +1,32 @@
+<!doctype html><html><body><pre id="o" style="white-space:pre-wrap;font:12px/1.4 ui-monospace"></pre><script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}
+function t(n){try{return typeof eval(n)}catch(e){return "err"}}
+(async function(){
+ lg("LANG PROBE "+navigator.userAgent);
+ var feats=[
+  ["WebAssembly",t("WebAssembly")],["SharedArrayBuffer",t("SharedArrayBuffer")],
+  ["Atomics",t("Atomics")],["BigInt",t("BigInt")],["BigInt64Array",t("BigInt64Array")],
+  ["Proxy",t("Proxy")],["Reflect",t("Reflect")],["Symbol",t("Symbol")],
+  ["WeakRef",t("WeakRef")],["FinalizationRegistry",t("FinalizationRegistry")],
+  ["globalThis",t("globalThis")],["queueMicrotask",t("queueMicrotask")],
+  ["structuredClone",t("structuredClone")],["TextEncoder",t("TextEncoder")],
+  ["TextDecoder",t("TextDecoder")],["OffscreenCanvas",t("OffscreenCanvas")],
+  ["AudioWorklet",t("AudioWorklet")],["Worker",t("Worker")],["ServiceWorker",t("navigator.serviceWorker")],
+  ["WebSocket",t("WebSocket")],["RTCPeerConnection",t("RTCPeerConnection")],
+  ["fetch",t("fetch")],["crypto.subtle",t("crypto.subtle")],
+  ["indexedDB",t("indexedDB")],["localStorage",t("localStorage")],
+  ["FontFace",t("FontFace")],["document.fonts",t("document.fonts")],
+  ["eval",t("eval")],["Function",t("Function")],["import",t("import")],
+  ["WebGL2",t("WebGL2RenderingContext")],["WebGPU",t("navigator.gpu")],
+  ["toSorted",t("([].toSorted)")],["groupBy",t("Object.groupBy")],
+  ["withResolvers",t("Promise.withResolvers")],["replaceAll",t("(''.replaceAll)")],
+  ["Array.at",t("([].at)")],["Object.hasOwn",t("Object.hasOwn")],
+  ["BigInt.asUintN",t("BigInt.asUintN")],["WeakMap",t("WeakMap")]
+ ];
+ for(var i=0;i<feats.length;i++) lg(feats[i][0]+"="+feats[i][1]);
+ lg("eval test: "+eval("1+1"));
+ try{ var f=new Function("return 2+2"); lg("Function test: "+f()); }catch(e){ lg("Function threw: "+e.message); }
+ lg("done");
+})();
+</script></body></html>

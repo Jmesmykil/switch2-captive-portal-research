@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><title>SWITCH LIVE TAIL</title>
+<style>
+html,body{margin:0;background:#07090d;color:#cfe3ff;font-family:system-ui}
+#h{padding:8px 14px;background:#0f1520;border-bottom:1px solid #22304a;font-size:13px}
+#o{padding:10px 14px;font:12px/1.4 ui-monospace,monospace;white-space:pre-wrap}
+.h{color:#7fd6a8}.r{color:#e8b44a}
+</style></head><body>
+<div id="h">SWITCH LIVE TAIL — events from 192.168.50.1:8765</div>
+<pre id="o">connecting…\n</pre>
+<script>
+var o=document.getElementById("o"),es=new EventSource("/events");
+es.onmessage=function(e){
+  var d=JSON.parse(e.data);
+  var sp=document.createElement("span");
+  sp.className = d.kind==="report" ? "r" : "h";
+  sp.textContent = (d.kind==="report" ? "REPORT " : "") + d.text + "\n";
+  o.appendChild(sp); o.scrollTop = o.scrollHeight;
+};
+es.onerror=function(){ o.textContent += "[stream reconnecting]\n"; };
+</script></body></html>

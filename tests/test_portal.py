@@ -2,6 +2,7 @@ import importlib.util
 import json
 import re
 import threading
+import tempfile
 import unittest
 from http.client import HTTPConnection
 from pathlib import Path
@@ -11,11 +12,13 @@ SOURCE = ROOT.parent / 'serve-switch2-browser-probe.py'
 spec = importlib.util.spec_from_file_location('portal_under_test', SOURCE)
 portal = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(portal)
-portal.REPORT_DIRECTORY = ROOT / 'host-test-reports'
 
 
 class PortalTests(unittest.TestCase):
     def setUp(self):
+        reports = tempfile.TemporaryDirectory(prefix="switch2-host-reports-")
+        self.addCleanup(reports.cleanup)
+        portal.REPORT_DIRECTORY = Path(reports.name)
         self.server = portal.ProbeHTTPServer(('127.0.0.1', 0), True, True)
         self.thread = threading.Thread(target=self.server.serve_forever, kwargs={'poll_interval': .01})
         self.thread.start()
@@ -86,6 +89,27 @@ class PortalTests(unittest.TestCase):
         self.assertEqual(self.server.sessions[self.key]['pending'], [])
         self.assertIsNone(self.server.sessions[self.key]['running'])
 
+    def test_control_queues_all_seven_installed_diagnostics(self):
+        tests = sorted(portal.TEST_NAMES)
+        self.assertEqual(len(tests), 7)
+        headers = {'X-Control-Token': self.server.control_token}
+        body = {'tests': tests, 'session': self.key}
+        code, value = self.request('/control', body, extra=headers)
+        self.assertEqual(code, 200)
+        self.assertEqual([job['test'] for job in value['queued']], tests)
+        self.assertEqual([job['test'] for job in self.server.sessions[self.key]['pending']], tests)
+        self.assertEqual(self.request('/control', body, extra=headers)[0], 409)
+        self.assertEqual(self.request('/live/stop', {}, self.key), (200, {'stopped': True}))
+        self.assertEqual(self.server.sessions[self.key]['pending'], [])
+
+    def test_control_rejects_oversized_or_unknown_diagnostic_sets(self):
+        headers = {'X-Control-Token': self.server.control_token}
+        for tests in [sorted(portal.TEST_NAMES) + ['runtime'], ['unknown'], [], [{}]]:
+            with self.subTest(tests=tests):
+                body = {'tests': tests, 'session': self.key}
+                self.assertEqual(self.request('/control', body, extra=headers)[0], 400)
+        self.assertEqual(self.server.sessions[self.key]['pending'], [])
+
     def test_oversized_queue_rejected_without_pending_jobs(self):
         tests = sorted(portal.TEST_NAMES) + ['runtime']
         self.assertEqual(self.request('/live/queue', {'tests': tests}, self.key)[0], 400)
@@ -136,20 +160,31 @@ class PortalTests(unittest.TestCase):
         self.assertEqual(json.loads(saved)['browser']['userAgent'], 'host-test')
         self.assertEqual(self.request('/live/result', result, self.key)[0], 409)
 
-    def test_revision_bound_module_and_read_only_catalog(self):
+    def test_revision_bound_module_and_removed_catalog(self):
         rev = self.server.module_revision('boundaries')
         self.assertEqual(self.request('/switch2-probes-boundaries.js?v=' + rev)[0], 200)
         self.assertEqual(self.request('/switch2-probes-boundaries.js?v=' + '0' * 64)[0], 409)
-        code, catalog = self.request('/research-catalog')
-        self.assertEqual(code, 200)
-        self.assertEqual(len(catalog['history']), 0)
-        self.assertTrue(all(not r['runnableHere'] for r in catalog['history'] + catalog['unfinished']))
-        self.assertNotIn('/Users/', json.dumps(catalog))
+        self.assertEqual(self.request('/research-catalog')[0], 404)
 
-    def test_old_page_build_still_supported(self):
-        code, hello = self.request('/live/hello', {'pageBuild': 3, 'browser': {'userAgent': 'legacy-host-test', 'platform': 'host'}})
-        self.assertEqual(code, 201)
-        self.assertEqual(len(self.server.sessions[hello['session']]['pending']), 3)
+    def test_stale_or_missing_build_requires_reload_without_creating_work(self):
+        count = len(self.server.sessions)
+        for build in (None, 2, 3, True, 999):
+            with self.subTest(build=build):
+                body = {'browser': {'userAgent': 'host-test', 'platform': 'host'}}
+                if build is not None:
+                    body['pageBuild'] = build
+                code, result = self.request('/live/hello', body)
+                self.assertEqual(code, 400)
+                self.assertIn('Reload', result['error'])
+                self.assertEqual(len(self.server.sessions), count)
+        self.assertEqual(self.server.sessions[self.key]['pending'], [])
+
+    def test_retired_and_private_files_are_not_served(self):
+        for route in ('/research-catalog', '/scenario.html', '/ultimate-probe.html',
+                      '/cve-2026-43715-cssfontface-uaf.html', '/CFW-ROADMAP.md',
+                      '/work/maintenance-20261101/historical-material.zip', '/traffic.jsonl'):
+            with self.subTest(route=route):
+                self.assertEqual(self.request(route)[0], 404)
 
     def test_no_native_or_arbitrary_file_routes(self):
         self.assertEqual(self.request('/native/call', {'svc': 1}, self.key)[0], 404)

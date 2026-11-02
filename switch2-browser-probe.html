@@ -25,18 +25,6 @@ fieldset{border:1px solid #41616d;border-radius:8px;margin:18px 0;padding:12px}h
 <div id="results">No live results yet.</div>
 <button id="export">Show report</button>
 <textarea id="report" readonly hidden rows="10" aria-label="Current browser report" style="width:100%;box-sizing:border-box"></textarea>
-<h2>Probe library</h2>
-<p id="library-note" class="note">Loading the recorded probe library…</p>
-<label for="library-filter">View </label><select id="library-filter"><option value="unfinished">Unfinished work</option><option value="history">Historical evidence</option></select>
-<label for="library-search"> Search </label><input id="library-search" type="search" maxlength="80">
-<div id="library"></div>
-<h2>SmileBASIC companion</h2>
-<p>Use a separate program slot after saving your work. Keep NS2/NS2GOOD intact. This small script records a variable in RAM:</p>
-<pre>PORTALMARK=271026
-PRINT "PORTAL BASELINE"
-PRINT PORTALMARK
-END</pre>
-<p>After visiting the portal and returning to Direct mode, enter <code>PRINT PORTALMARK,271027</code>. Record the actual output or error. A retained value is interpreter continuity evidence. This companion has been prepared on the Mac and has not been run on the Switch.</p>
 <p class="note">Feature names, successful tests, and browser hardware hints are separate evidence. A browser connection alone does not establish native code execution.</p>
 <noscript>JavaScript is unavailable.</noscript></main>
 <script>window.SwitchProbeModules = [];</script>
@@ -45,7 +33,7 @@ END</pre>
  'use strict';
  var status = document.getElementById('status'), results = document.getElementById('results');
  var session = null, active = false, busy = false, timer = null, generation = 0, started = 0, lines = [], pendingLoad = null;
- var pendingCount = 0, reports = [], catalog = null;
+ var pendingCount = 0, reports = [];
  function buttons() {
   var list = document.querySelectorAll('.probe');
   for (var i = 0; i < list.length; i++) { list[i].disabled = !active || !session || busy || pendingCount > 0; }
@@ -160,43 +148,11 @@ END</pre>
    if (g === generation && active) { show('Queued '+tests.join(', ')+'.'); }
   }).catch(function (error) { if (g !== generation) { return; } pendingCount = 0; buttons(); show(error.message); });
  }
- function renderLibrary() {
-  if (!catalog) { return; }
-  var list = document.getElementById('library'), search = document.getElementById('library-search').value.toLowerCase();
-  var entries = catalog[document.getElementById('library-filter').value] || [];
-  while (list.firstChild) { list.removeChild(list.firstChild); }
-  for (var i = 0; i < entries.length; i++) {
-   var item = entries[i];
-   if ((item.title+' '+item.status+' '+item.scope).toLowerCase().indexOf(search) < 0) { continue; }
-   var box = document.createElement('details'), title = document.createElement('summary'), text = document.createElement('p');
-   title.textContent = item.title+' — '+item.status; text.textContent = item.scope;
-   box.appendChild(title); box.appendChild(text); list.appendChild(box);
-  }
-  if (!list.firstChild) { list.textContent = 'No matching entries.'; }
- }
- function loadLibrary() {
-  var xhr = new XMLHttpRequest(); xhr.open('GET','/research-catalog',true); xhr.timeout = 6000;
-  xhr.onload = function () {
-   try {
-    if (xhr.status !== 200) { throw new Error('Library unavailable'); }
-    var value = JSON.parse(xhr.responseText);
-    if (value.schemaVersion !== 1 || !Array.isArray(value.history) || !Array.isArray(value.unfinished) || value.history.length > 64 || value.unfinished.length > 64) { throw new Error('Invalid library'); }
-    catalog = value;
-    var coverage = value.sourceCoverage;
-    document.getElementById('library-note').textContent = value.history.length+' historical entries and '+value.unfinished.length+' unfinished topics. '+value.snapshotNote+' Snapshot: '+value.generatedAt+(coverage ? '\nHistorical inventory: '+coverage.namespaceGroups+' source namespaces, '+coverage.observedGetInfoTuples+' observed GetInfo tuples. '+coverage.limit : '');
-    renderLibrary();
-   } catch (error) { document.getElementById('library-note').textContent = 'Probe library unavailable. Browser tests remain available.'; }
-  };
-  xhr.onerror = xhr.ontimeout = function () { document.getElementById('library-note').textContent = 'Cannot load the probe library.'; };
-  xhr.send();
- }
  document.getElementById('connect').onclick = connect; document.getElementById('stop').onclick = stop;
  var testButtons = document.querySelectorAll('[data-test]');
  for (var b = 0; b < testButtons.length; b++) { testButtons[b].onclick = function () { queue([this.getAttribute('data-test')]); }; }
  document.getElementById('baseline').onclick = function () { queue(['network','runtime','media','boundaries','fonts','webkit','fontenv']); };
- document.getElementById('library-filter').onchange = renderLibrary;
- document.getElementById('library-search').oninput = renderLibrary;
  document.getElementById('export').onclick = function () { var field = document.getElementById('report'); field.hidden = false; field.value = JSON.stringify({ pageBuild:4, exportedAt:new Date().toISOString(), browser:navigator.userAgent, reports:reports },null,2); };
- loadLibrary(); connect();
+ connect();
 }());
 </script></body></html>

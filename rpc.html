@@ -1,0 +1,32 @@
+<!doctype html><html><body style="margin:0;padding:10px;font-family:system-ui;background:#07090d;color:#cfe3ff">
+<h1 style="font-size:16px">WebView RPC agent</h1>
+<div id="st" style="font:12px ui-monospace;color:#9fb4d6">starting…</div>
+<pre id="o" style="font:12px/1.4 ui-monospace;white-space:pre-wrap;color:#9fb4d6"></pre>
+<script>
+var o=document.getElementById("o"),st=document.getElementById("st");
+function log(s){o.textContent+=s+"\n";}
+function post(u,b){return fetch(u,{method:"POST",headers:{"content-type":"application/json"},body:b}).catch(function(){})}
+async function poll(){
+  try{
+    var r=await fetch("/poll",{cache:"no-store"});
+    var arr=await r.json();
+    for(var i=0;i<arr.length;i++){await exec(arr[i])}
+  }catch(e){}
+  setTimeout(poll,900);
+}
+async function exec(c){
+  log("cmd "+JSON.stringify(c));
+  var out={cmd:c.cmd,ok:true};
+  try{
+    if(c.cmd==="ping"){out.pong=Date.now();out.ua=navigator.userAgent;}
+    else if(c.cmd==="eval"){out.value=String(eval(c.code));}
+    else if(c.cmd==="probe"){out.fonts=!!document.fonts;out.ff=typeof FontFace;out.wasm=typeof WebAssembly;}
+    else {out.error="unknown"}
+  }catch(e){out.ok=false;out.error=String(e)}
+  await post("/result",JSON.stringify(out));
+  st.textContent="last: "+JSON.stringify(out).slice(0,120);
+}
+log("agent ready — polling /poll");
+st.textContent="ready";
+poll();
+</script></body></html>

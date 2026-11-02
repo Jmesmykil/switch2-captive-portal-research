@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><title>FULL MAP</title>
+<style>
+html,body{margin:0;background:#0b0e14;color:#cfe3ff;font-family:system-ui}
+#h{padding:10px 14px;background:#111827;border-bottom:1px solid #24304a;font-size:14px}
+#m{padding:10px 14px;font:11px/1.35 ui-monospace,monospace;white-space:pre-wrap;word-break:break-word}
+</style></head><body>
+<div id="h">FULL MAP — wkc3 + chat + ldn + certs</div>
+<div id="m">loading…</div>
+<script>
+fetch("/fullmap.md",{cache:"no-store"}).then(r=>r.text()).then(t=>{
+  document.getElementById("m").textContent=t;
+}).catch(e=>{
+  document.getElementById("m").textContent="fetch failed: "+e;
+});
+</script></body></html>

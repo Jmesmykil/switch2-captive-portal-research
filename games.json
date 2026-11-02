@@ -1,0 +1,10 @@
+{
+ "games": [
+  {
+   "uuid": "0100c9100b06a000",
+   "name": "SmileBASIC (JP)",
+   "kind": "app"
+  }
+ ],
+ "note": "uuid = title id; add installed games from the console dump"
+}

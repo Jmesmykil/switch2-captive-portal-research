@@ -30,18 +30,22 @@ class EntryTests(unittest.TestCase):
         self.assertEqual(struct.unpack("!H", answer[6:8])[0], 0)
 
     def test_http_redirect_and_unrecognized_host(self):
-        services = entry.bind_services("127.0.0.1", 0, 0, 8765)
+        services = entry.bind_services("127.0.0.1", 0, 0, 9876)
         http = services[2]
         thread = threading.Thread(target=http.serve_forever, kwargs={"poll_interval": .01})
         thread.start()
         try:
-            for host, expected in (("ctest.p01.ctest.srv.nintendo.net", 302), ("example.invalid", 404)):
+            allowed = sorted(entry.HOSTS) + [
+                "p01.us.savanna.srv.nintendo.net", "savanna.srv.nintendo.net",
+                "p01.us.idobata.srv.nintendo.net",
+            ]
+            for host, expected in [(name, 302) for name in allowed] + [("example.invalid", 404)]:
                 conn = HTTPConnection("127.0.0.1", http.server_port, timeout=2)
                 conn.request("GET", "/", headers={"Host": host})
                 response = conn.getresponse()
                 self.assertEqual(response.status, expected)
                 if expected == 302:
-                    self.assertEqual(response.getheader("Location"), "http://127.0.0.1:8765/")
+                    self.assertEqual(response.getheader("Location"), "http://127.0.0.1:9876/")
                 response.read()
                 conn.close()
         finally:

